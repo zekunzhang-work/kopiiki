@@ -145,17 +145,6 @@ python3 -m http.server 8000
 
 ---
 
-## 🗺️ Roadmap
-
-- [x] Playwright-based full-page extraction
-- [x] Deep asset downloading (CSS, JS, images, fonts)
-- [x] Component structure detection
-- [x] Modern React UI
-- [x] Docker support
-- [ ] **Kopiiki-Agent** — AI-powered website-to-React code generation
-
----
-
 ## ⚠️ Disclaimer
 
 This tool is intended for **personal backup, self-testing, educational, and research purposes only**. Users are solely responsible for ensuring their use complies with:
