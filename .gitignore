@@ -1,0 +1,35 @@
+# Runtime
+venv/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+
+# Build output
+dist/
+build/
+
+# Kopiiki working directories
+downloads/
+extracted_sites/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+nohup.out
+backend.log
+
+# Environment
+.env
+.env.local
+backend/test*

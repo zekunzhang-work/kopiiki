@@ -1,0 +1,7 @@
+flask
+playwright
+flask-cors
+beautifulsoup4
+cssutils
+requests
+html5lib

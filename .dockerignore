@@ -1,0 +1,12 @@
+venv/
+node_modules/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+*.md
+*.log
+downloads/
+extracted_sites/
+frontend_bak/
+.DS_Store
