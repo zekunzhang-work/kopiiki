@@ -655,6 +655,7 @@ def create_zip_file(html_content, assets, url, session_obj, headers, screenshots
 
                     parsed_asset = urlparse(url)
                     path = parsed_asset.path
+                    query = parsed_asset.query
                     filename = os.path.basename(unquote(path))
 
                     # Fallback for empty filenames
@@ -673,7 +674,23 @@ def create_zip_file(html_content, assets, url, session_obj, headers, screenshots
                         }
                         ext = ext_map.get(asset_type, '')
 
-                    # Clean the name: keep alphanumeric, hyphens, underscores
+                    # When the path-based name is too generic (e.g. "css", "js", "api"),
+                    # try to enrich it with info from the query string or domain
+                    if len(name) <= 3 and query:
+                        qs = parse_qs(query)
+                        # Google Fonts: extract family names
+                        if 'family' in qs:
+                            families = qs['family'][0].split('|')
+                            family_names = [f.split(':')[0].strip() for f in families]
+                            name = '_'.join(family_names)[:50]
+                        else:
+                            # Use the first meaningful query param value
+                            for k, v in qs.items():
+                                if v and v[0] and len(v[0]) > 1:
+                                    name = f'{name}_{v[0]}'
+                                    break
+
+                    # Clean the name: keep alphanumeric, hyphens, underscores, dots
                     name = re.sub(r'[^a-zA-Z0-9._\-]', '_', name)
                     # Remove consecutive underscores
                     name = re.sub(r'_+', '_', name).strip('_')
