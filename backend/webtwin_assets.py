@@ -639,6 +639,7 @@ def create_zip_file(html_content, assets, url, session_obj, headers, screenshots
                 continue
             zipf.writestr(f'{asset_type}/.gitkeep', '')
             processed_urls = set()
+            filename_counter = {}  # Track duplicate filenames
             for url in assets[asset_type]:
                 if not url or url.startswith('data:'):
                     continue
@@ -651,29 +652,58 @@ def create_zip_file(html_content, assets, url, session_obj, headers, screenshots
                     elif url.startswith('/'):
                         parsed_base = urlparse(parsed_url.scheme + '://' + parsed_url.netloc)
                         url = urljoin(parsed_base.geturl(), url)
-                    path = urlparse(url).path
-                    query = urlparse(url).query
+
+                    parsed_asset = urlparse(url)
+                    path = parsed_asset.path
                     filename = os.path.basename(unquote(path))
+
+                    # Fallback for empty filenames
                     if not filename:
-                        filename = f'{timestamp}_{uuid.uuid4().hex[:8]}.{asset_type}'
-                    elif '.' not in filename:
-                        filename = f'{filename}.{asset_type}'
-                    if query:
-                        clean_query = re.sub('[^a-zA-Z0-9]', '_', query)[:30]
-                        (name, ext) = os.path.splitext(filename)
-                        filename = f'{name}_{clean_query}{ext}'
+                        filename = f'{uuid.uuid4().hex[:8]}'
+
+                    # Split name and extension
+                    name, ext = os.path.splitext(filename)
+
+                    # Infer extension from asset_type if missing
+                    if not ext:
+                        ext_map = {
+                            'css': '.css', 'js': '.js', 'images': '.png',
+                            'fonts': '.woff2', 'favicons': '.ico',
+                            'videos': '.mp4', 'audio': '.mp3',
+                        }
+                        ext = ext_map.get(asset_type, '')
+
+                    # Clean the name: keep alphanumeric, hyphens, underscores
+                    name = re.sub(r'[^a-zA-Z0-9._\-]', '_', name)
+                    # Remove consecutive underscores
+                    name = re.sub(r'_+', '_', name).strip('_')
+
+                    # Truncate name to keep total filename readable (max 60 chars)
+                    max_name_len = 60 - len(ext)
+                    if len(name) > max_name_len:
+                        name = name[:max_name_len].rstrip('_')
+
+                    filename = f'{name}{ext}'
+
+                    # Deduplicate: append counter if filename already seen
+                    if filename in filename_counter:
+                        filename_counter[filename] += 1
+                        filename = f'{name}_{filename_counter[filename]}{ext}'
+                    else:
+                        filename_counter[filename] = 0
+
                     file_path = f'{asset_type}/{filename}'
                     try:
                         response = session_obj.get(url, timeout=10, headers=headers, verify=False)
                         if response.status_code == 200:
                             zipf.writestr(file_path, response.content)
-                            logger.debug(f'  Added {file_path}')
+                            logger.debug(f'Added {file_path}')
                         else:
-                            logger.warning(f'  Failed to download {url}, status: {response.status_code}')
+                            logger.warning(f'Failed to download {url}, status: {response.status_code}')
                     except Exception as e:
-                        logger.error(f'  Error downloading {url}: {str(e)}')
+                        logger.error(f'Error downloading {url}: {str(e)}')
                 except Exception as e:
-                    logger.error(f'  Error processing URL {url}: {str(e)}')
+                    logger.error(f'Error processing URL {url}: {str(e)}')
         if 'font_families' in assets and assets['font_families']:
             zipf.writestr('css/fonts.css', '\n'.join([f"/* Font Family: {family} */\n@import url('https://fonts.googleapis.com/css2?family={family.replace(' ', '+')}&display=swap');\n" for family in assets['font_families']]))
         if 'metadata' in assets and assets['metadata']:
