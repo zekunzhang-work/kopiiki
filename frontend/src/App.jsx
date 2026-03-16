@@ -1,37 +1,26 @@
 import { useState } from 'react';
 import './index.css';
 
-// SVG Icon Component
-const ZapIcon = () => (
-  <svg
-    className="logo-icon"
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
-  </svg>
-);
+import AsciiTitle from './components/AsciiTitle';
+import ScanlineOverlay from './components/ScanlineOverlay';
+import MarkdownTerminal from './components/MarkdownTerminal';
 
 function App() {
-  const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [result, setResult] = useState(false);
 
-  const handleExtract = async (e) => {
-    e.preventDefault();
-    if (!url.trim()) return;
+  // Helper to append formatting logs
+  const appendLog = (msgObj) => {
+    setLogs(prev => [...prev, msgObj]);
+  };
 
+  const handleExtract = async (url) => {
     setIsLoading(true);
     setIsError(false);
-    setMessage("Connecting to engine...");
+    setResult(false);
+    setLogs([{ status: 'sys', message: `INITIATING CONNECTION TO ${url}...` }]);
 
     try {
       const apiBase = import.meta.env.VITE_API_URL || '';
@@ -57,11 +46,18 @@ function App() {
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          setMessage(data.message);
+          
+          // Append the new log entry
+          setLogs(prev => {
+            // Avoid duplicate exact messages in a row
+            if (prev.length > 0 && prev[prev.length - 1].message === data.message) return prev;
+            return [...prev, { status: data.status, message: data.message }];
+          });
           
           if (data.status === 'complete') {
             eventSource.close();
             setIsLoading(false);
+            setResult(true);
             
             // Trigger actual download now that extraction is done
             if (data.download_url) {
@@ -84,15 +80,14 @@ function App() {
       };
 
       eventSource.onerror = () => {
-        // SSE error (e.g., connection drop)
         eventSource.close();
         setIsError(true);
-        setMessage("Connection to server lost. Extraction may have failed.");
+        appendLog({ status: 'error', message: "CONNECTION TO SERVER LOST. ABORTING." });
         setIsLoading(false);
       };
 
     } catch (err) {
-      setMessage(`Failed to start: ${err.message}`);
+      appendLog({ status: 'error', message: `FATAL EXCEPTION: ${err.message}` });
       setIsError(true);
       setIsLoading(false);
     }
@@ -100,33 +95,15 @@ function App() {
 
   return (
     <div className="app-container">
-      <ZapIcon />
-      <h1>Kopiiki</h1>
-      <p className="subtitle">High-fidelity Web Extraction Engine.</p>
-
-      <form onSubmit={handleExtract} className="input-group">
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com"
-          required
-          autoComplete="off"
-          disabled={isLoading}
-        />
-        <button type="submit" disabled={isLoading || !url.trim()}>
-          Extract Assets
-        </button>
-      </form>
-
-      <div className="status-area">
-        {isLoading && <div className="spinner"></div>}
-        {message && (
-          <div className={`message ${isError ? 'error' : ''}`}>
-            {message}
-          </div>
-        )}
-      </div>
+      <ScanlineOverlay active={isLoading} />
+      <AsciiTitle />
+      <MarkdownTerminal 
+        onExtract={handleExtract} 
+        isLoading={isLoading} 
+        logs={logs} 
+        result={result} 
+        isError={isError} 
+      />
     </div>
   );
 }
