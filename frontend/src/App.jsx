@@ -63,29 +63,14 @@ function App() {
             // Trigger actual download now that extraction is done
             if (data.download_url) {
                 const downloadFullUrl = `${apiBase}${data.download_url}`;
-                
-                // Fetch as blob to strictly enforce the filename on cross-origin requests
-                appendLog({ status: 'sys', message: `DOWNLOADING ARTIFACT TO LOCAL FS...` });
-                
-                fetch(downloadFullUrl)
-                  .then(res => res.blob())
-                  .then(blob => {
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = blobUrl;
-                    // Extract safe_domain from data.download_url (e.g. /api/download/react.dev)
-                    const fileName = data.download_url.split('/').pop() + '.zip';
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(blobUrl);
-                    appendLog({ status: 'complete', message: `DOWNLOAD SECURED: ${fileName}` });
-                  })
-                  .catch(err => {
-                    appendLog({ status: 'error', message: `DOWNLOAD FAILED: ${err.message}` });
-                  });
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadFullUrl;
+                // EXPLICITLY set the filename attribute to force browser naming
+                a.download = data.filename || 'site_extraction.zip';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             }
           } else if (data.status === 'error') {
             eventSource.close();
