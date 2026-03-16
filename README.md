@@ -161,4 +161,4 @@ The authors of Kopiiki are not responsible for any misuse of this tool.
 
 [MIT](LICENSE)
 
-Kopiiki is built upon the foundation of [**WebTwin**](https://github.com/nicosica99/WebTwin) by [@nicosica99](https://github.com/nicosica99). The original WebTwin copyright is preserved in the LICENSE file. We are grateful for the open-source work that made this project possible.
+Kopiiki is built upon the foundation of [**WebTwin**](https://github.com/sirioberati/WebTwin) by [@sirioberati](https://github.com/sirioberati) (Sirio Berati). The original WebTwin copyright is preserved in the LICENSE file. We are grateful for the open-source work that made this project possible.
