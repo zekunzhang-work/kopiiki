@@ -23,7 +23,8 @@ function App() {
     setLogs([{ status: 'sys', message: `INITIATING CONNECTION TO ${url}...` }]);
 
     try {
-      const apiBase = import.meta.env.VITE_API_URL || '';
+      // In dev mode, default to localhost:5002 if no env is set
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5002';
       // 1. Start the extraction job and get an ID
       const startResponse = await fetch(`${apiBase}/api/extract`, {
         method: 'POST',
