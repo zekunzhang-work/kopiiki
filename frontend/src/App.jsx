@@ -31,26 +31,12 @@ function App() {
 
     setIsLoading(true);
     setIsError(false);
-
-    // Animate some interesting messages during the long playwright extraction
-    let messageIndex = 0;
-    const progressMessages = [
-      "Initializing Headless Browser...",
-      "Navigating to URL & Bypassing Anti-Bot...",
-      "Injecting CSS to Freeze Animations...",
-      "Scrolling to Trigger Lazy-loaded Assets...",
-      "Compiling Final DOM & Downloading ZIP..."
-    ];
-
-    setMessage(progressMessages[0]);
-    const messageInterval = setInterval(() => {
-      messageIndex = (messageIndex + 1) % progressMessages.length;
-      setMessage(progressMessages[messageIndex]);
-    }, 4500);
+    setMessage("Connecting to engine...");
 
     try {
       const apiBase = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiBase}/api/extract`, {
+      // 1. Start the extraction job and get an ID
+      const startResponse = await fetch(`${apiBase}/api/extract`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,50 +44,56 @@ function App() {
         body: JSON.stringify({ url }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server responded with ${response.status}`);
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server responded with ${startResponse.status}`);
       }
-
-      // Handle transparent ZIP blob download
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = downloadUrl;
-
-      // Grab filename from header if possible, else fallback to domain name
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'extracted_site.zip';
       
-      if (contentDisposition && contentDisposition.indexOf('attachment') !== -1) {
-        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
-        if (matches != null && matches[1]) {
-          filename = matches[1].replace(/['"]/g, '');
-        }
-      } else {
-        // Fallback: extract domain from the user's input URL
+      const { extract_id } = await startResponse.json();
+      
+      // 2. Connect to the SSE stream using the ID
+      const eventSource = new EventSource(`${apiBase}/api/extract/stream/${extract_id}`);
+      
+      eventSource.onmessage = (event) => {
         try {
-          const domain = new URL(url).hostname.replace('www.', '');
-          filename = `${domain || 'extracted_site'}.zip`;
-        } catch (e) {
-          // Keep the default 'extracted_site.zip' if URL parsing fails
+          const data = JSON.parse(event.data);
+          setMessage(data.message);
+          
+          if (data.status === 'complete') {
+            eventSource.close();
+            setIsLoading(false);
+            
+            // Trigger actual download now that extraction is done
+            if (data.download_url) {
+                const downloadFullUrl = `${apiBase}${data.download_url}`;
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = downloadFullUrl;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+          } else if (data.status === 'error') {
+            eventSource.close();
+            setIsError(true);
+            setIsLoading(false);
+          }
+        } catch (err) {
+          console.error("Error parsing SSE data", err);
         }
-      }
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(downloadUrl);
+      };
 
-      clearInterval(messageInterval);
-      setMessage('Extraction Complete! ZIP downloaded.');
-      setIsError(false);
+      eventSource.onerror = () => {
+        // SSE error (e.g., connection drop)
+        eventSource.close();
+        setIsError(true);
+        setMessage("Connection to server lost. Extraction may have failed.");
+        setIsLoading(false);
+      };
 
     } catch (err) {
-      clearInterval(messageInterval);
-      setMessage(`Extraction Failed: ${err.message}`);
+      setMessage(`Failed to start: ${err.message}`);
       setIsError(true);
-    } finally {
       setIsLoading(false);
     }
   };
