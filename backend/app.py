@@ -4,10 +4,13 @@ import zipfile
 import threading
 import requests
 from urllib.parse import urlparse
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from webtwin_assets import extract_assets, create_zip_file, fix_relative_urls
+import uuid
+import time
+import json
 
 # Optional specific playwright import (previously added during WebTwin refactor)
 try:
@@ -21,6 +24,9 @@ app = Flask(__name__)
 # Enable CORS to allow React frontend (e.g. localhost:5173) to send requests
 CORS(app, expose_headers=["Content-Disposition"])
 
+# Global map to store progress for SSE
+EXTRACTION_PROGRESS = {}
+
 # --- Configuration (moved from old WebTwin app.py) ---
 DOWNLOAD_FOLDER = 'downloads'
 EXTRACTED_FOLDER = 'extracted_sites'
@@ -32,17 +38,40 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(EXTRACTED_FOLDER, exist_ok=True)
 
 
-def extract_with_playwright(url, output_dir):
+def extract_with_playwright(url, output_dir, extract_id=None):
     """
-    Advanced extraction using Playwright to handle dynamic content, lazy loading and strip animations.
-    Ported from the refactored WebTwin.
+    Advanced extraction using Playwright:
+    1. Handles dynamic content and lazy loading.
+    2. intercepts and captures all network responses in memory (solving double-fetch).
+    3. injects removable anti-animation CSS.
     """
+    def update_progress(msg, status="processing"):
+        if extract_id and extract_id in EXTRACTION_PROGRESS:
+            EXTRACTION_PROGRESS[extract_id]["message"] = msg
+            if status:
+                EXTRACTION_PROGRESS[extract_id]["status"] = status
+                
+    update_progress(f"Starting Playwright browser for {url}...")
     print(f"[{threading.current_thread().name}] Starting Playwright extraction for URL: {url}")
     
     html_content = ""
     error_msg = None
     timeout = 30 # seconds
-    
+    captured_assets = {} # url -> bytes
+
+    def handle_response(response):
+        # Only capture successful responses for assets
+        try:
+            if response.ok and response.request.resource_type in ["image", "stylesheet", "script", "font", "media"]:
+                url = response.url
+                # Avoid capturing data URIs or base64 directly as network events
+                if url.startswith("http"):
+                    body = response.body()
+                    captured_assets[url] = body
+        except Exception as e:
+            # Body might not be available for some redirects or opaque responses
+            pass
+            
     with sync_playwright() as p:
         try:
             browser = p.chromium.launch(
@@ -66,7 +95,9 @@ def extract_with_playwright(url, output_dir):
             )
             
             page = context.new_page()
+            page.on("response", handle_response)
             
+            update_progress("Navigating to URL and bypassing anti-bot protections...")
             print(f"[{threading.current_thread().name}] Navigating to {url} ...")
             # Using networkidle to wait for lazy multi-media to stop requesting
             response = page.goto(url, wait_until="networkidle", timeout=timeout * 1000)
@@ -74,7 +105,7 @@ def extract_with_playwright(url, output_dir):
             if response and not response.ok:
                  print(f"[{threading.current_thread().name}] Warning: Page returned status {response.status}")
                  
-            # 1. Disable animations immediately via injected CSS
+            # 1. Disable animations immediately via injected CSS (with ID for easy removal)
             disable_animation_css = """
             * {
                 animation-duration: 0.001s !important;
@@ -84,6 +115,13 @@ def extract_with_playwright(url, output_dir):
             }
             """
             page.add_style_tag(content=disable_animation_css)
+            # Find the just-added style tag and give it an ID
+            page.evaluate("""() => {
+                const styles = document.querySelectorAll('style');
+                const lastStyle = styles[styles.length - 1];
+                if (lastStyle) lastStyle.id = 'kopiiki-animation-freezer';
+            }""")
+            
             
             # 2. Emulate scroll to trigger lazy loading
             scroll_script = """
@@ -105,6 +143,7 @@ def extract_with_playwright(url, output_dir):
                 });
             }
             """
+            update_progress("Scrolling page to trigger lazy-loaded images & scripts...")
             print(f"[{threading.current_thread().name}] Scrolling to trigger lazy loading...")
             page.evaluate(scroll_script)
             
@@ -113,7 +152,12 @@ def extract_with_playwright(url, output_dir):
             
             # Fetch the final static DOM snapshot
             html_content = page.content()
-            print(f"[{threading.current_thread().name}] Extraction completed. HTML length: {len(html_content)}")
+            
+            # Remove the freezing CSS so the downloaded HTML retains animations
+            import re
+            html_content = re.sub(r'<style id="kopiiki-animation-freezer">.*?</style>', '', html_content, flags=re.DOTALL)
+            
+            print(f"[{threading.current_thread().name}] Extraction completed. HTML length: {len(html_content)}. Captured {len(captured_assets)} assets in memory.")
 
         except PlaywrightTimeoutError:
              error_msg = f"Timeout loading {url} within {timeout} seconds."
@@ -128,7 +172,7 @@ def extract_with_playwright(url, output_dir):
     if error_msg:
         raise Exception(error_msg)
         
-    return html_content
+    return html_content, captured_assets
 
 def create_zip_from_dir(source_dir, zip_filename):
     zipf = zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED)
@@ -140,6 +184,44 @@ def create_zip_from_dir(source_dir, zip_filename):
     zipf.close()
 
 
+def process_extraction(extract_id, url, output_dir, zip_path, safe_domain):
+    try:
+        EXTRACTION_PROGRESS[extract_id]["message"] = "Initializing extraction pipeline..."
+        
+        # 1. First extract the dynamic rendered HTML freezing animations, AND intercept all assets
+        raw_html_content, captured_assets = extract_with_playwright(url, output_dir, extract_id=extract_id)
+        
+        # 2. Fix all relative links directly using the legacy BS4 logic
+        EXTRACTION_PROGRESS[extract_id]["message"] = "Patching relative URL references in HTML..."
+        print(f"[{threading.current_thread().name}] Fixing relative URL references...")
+        fixed_html = fix_relative_urls(raw_html_content, url)
+        
+        # 3. Use unified session for fast asset download (Fallback only)
+        session_obj = requests.Session()
+        headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36' }
+        
+        # 4. Parse HTML to find asset structure, but pass the captured assets
+        EXTRACTION_PROGRESS[extract_id]["message"] = "Parsing HTML to map dependencies and assets..."
+        print(f"[{threading.current_thread().name}] Parsing HTML for asset logic...")
+        assets = extract_assets(fixed_html, url, session_obj=session_obj, headers=headers, captured_assets=captured_assets)
+        
+        # 5. Pack the HTML and all discovered fetched assets straight into a fully fledged ZIP
+        EXTRACTION_PROGRESS[extract_id]["message"] = "Packaging everything into a downloadable ZIP archive..."
+        zip_path_tmp = create_zip_file(fixed_html, assets, url, session_obj, headers, captured_assets=captured_assets)
+        
+        # 6. Copy over to persistent download folder
+        shutil.copy2(zip_path_tmp, zip_path)
+        os.remove(zip_path_tmp)
+        
+        EXTRACTION_PROGRESS[extract_id]["status"] = "complete"
+        EXTRACTION_PROGRESS[extract_id]["message"] = "Extraction successful! Ready to download."
+        EXTRACTION_PROGRESS[extract_id]["download_url"] = f"/api/download/{safe_domain}"
+
+    except Exception as e:
+        print(f"Extraction Error: {e}")
+        EXTRACTION_PROGRESS[extract_id]["status"] = "error"
+        EXTRACTION_PROGRESS[extract_id]["message"] = f"Extraction failed: {str(e)}"
+
 @app.route('/api/extract', methods=['POST'])
 def api_extract():
     data = request.json or {}
@@ -147,6 +229,9 @@ def api_extract():
     
     if not url:
         return jsonify({"error": "URL is required"}), 400
+
+    if not PLAYWRIGHT_AVAILABLE:
+        return jsonify({"error": "Playwright is not installed on the backend. Please install it."}), 500
 
     parsed_url = urlparse(url)
     domain = parsed_url.netloc
@@ -162,38 +247,58 @@ def api_extract():
         shutil.rmtree(output_dir)
     os.makedirs(output_dir)
 
-    # Core logic: Extract HTML explicitly using Playwright
-    try:
-        if not PLAYWRIGHT_AVAILABLE:
-            return jsonify({"error": "Playwright is not installed on the backend. Please install it."}), 500
+    # Generate an ID for this extraction job and store it
+    extract_id = str(uuid.uuid4())
+    EXTRACTION_PROGRESS[extract_id] = {
+        "status": "processing",
+        "message": "Starting job...",
+        "url": url,
+        "download_url": None
+    }
+    
+    # Start the worker thread
+    thread = threading.Thread(target=process_extraction, args=(extract_id, url, output_dir, zip_path, safe_domain))
+    thread.daemon = True
+    thread.start()
+    
+    # Return immediately so the client can connect to SSE
+    return jsonify({"extract_id": extract_id})
+    
+
+@app.route('/api/extract/stream/<extract_id>')
+def api_extract_stream(extract_id):
+    def event_stream():
+        last_message = ""
+        while True:
+            if extract_id not in EXTRACTION_PROGRESS:
+                yield f"data: {json.dumps({'status': 'error', 'message': 'Unknown extraction ID'})}\n\n"
+                break
+                
+            progress = EXTRACTION_PROGRESS[extract_id]
             
-        # 1. First extract the dynamic rendered HTML freezing animations
-        raw_html_content = extract_with_playwright(url, output_dir)
-        
-        # 2. Fix all relative links directly using the legacy BS4 logic
-        print(f"[{threading.current_thread().name}] Fixing relative URL references...")
-        fixed_html = fix_relative_urls(raw_html_content, url)
-        
-        # 3. Use unified session for fast asset download
-        session_obj = requests.Session()
-        headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36' }
-        
-        # 4. Spin up the legacy Wget/Crawler style deep asset fetcher
-        print(f"[{threading.current_thread().name}] Start deep fetching linked CSS/JS/IMG assets...")
-        assets = extract_assets(fixed_html, url, session_obj=session_obj, headers=headers)
-        
-        # 5. Pack the HTML and all discovered fetched assets straight into a fully fledged ZIP
-        zip_path_tmp = create_zip_file(fixed_html, assets, url, session_obj, headers)
-        
-        # 6. Copy over to persistent download folder
-        shutil.copy2(zip_path_tmp, zip_path)
-        os.remove(zip_path_tmp)
-        
+            # Send an update if status changed, or just to keep connection alive
+            if progress["message"] != last_message or progress["status"] in ["complete", "error"]:
+                last_message = progress["message"]
+                yield f"data: {json.dumps(progress)}\n\n"
+                
+            if progress["status"] in ["complete", "error"]:
+                # Clean up memory after sending completion
+                time.sleep(1) # tiny wait to ensure client gets it
+                if extract_id in EXTRACTION_PROGRESS:
+                    del EXTRACTION_PROGRESS[extract_id]
+                break
+                
+            time.sleep(0.5)
+            
+    return Response(event_stream(), mimetype="text/event-stream")
+
+@app.route('/api/download/<domain>')
+def api_download(domain):
+    safe_domain = secure_filename(domain)
+    zip_path = os.path.join(DOWNLOAD_FOLDER, f"{safe_domain}.zip")
+    if os.path.exists(zip_path):
         return send_file(zip_path, as_attachment=True, download_name=f"{safe_domain}.zip")
-        
-    except Exception as e:
-        print(f"Extraction Error: {e}")
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "File not found"}), 404
 
 @app.route('/api/extract-json', methods=['POST'])
 def api_extract_json():

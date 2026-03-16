@@ -371,8 +371,10 @@ def extract_inline_javascript(soup):
         return '\n\n/* --- INLINE SCRIPTS --- */\n\n'.join(inline_js)
     return ''
 
-def extract_assets(html_content, base_url, session_obj=None, headers=None):
+def extract_assets(html_content, base_url, session_obj=None, headers=None, captured_assets=None):
     """Extract all assets from HTML content"""
+    if captured_assets is None:
+        captured_assets = {}
     assets = {'css': [], 'js': [], 'img': [], 'fonts': [], 'videos': [], 'audio': [], 'favicons': [], 'font_families': set(), 'metadata': {}, 'components': {}}
     if not html_content:
         logger.warning('Warning: Empty HTML content provided to extract_assets')
@@ -582,6 +584,10 @@ def extract_assets(html_content, base_url, session_obj=None, headers=None):
                         response = session_obj.get(css_url, timeout=10, headers=headers, verify=False)
                         if response.status_code == 200:
                             css_content = response.text
+                        elif css_url in captured_assets:
+                            css_content = captured_assets[css_url].decode('utf-8', errors='replace')
+                        
+                        if css_content:
                             url_matches = re.findall('url\\([\\\'"]?([^\\\'"|\\)]+)[\\\'"]?\\)', css_content) or []
                             for url in url_matches:
                                 if not url or url.startswith('data:'):
@@ -622,8 +628,10 @@ def extract_assets(html_content, base_url, session_obj=None, headers=None):
         traceback.print_exc()
         return assets
 
-def create_zip_file(html_content, assets, url, session_obj, headers, screenshots=None):
+def create_zip_file(html_content, assets, url, session_obj, headers, screenshots=None, captured_assets=None):
     """Create a zip file containing the extracted website data"""
+    if captured_assets is None:
+        captured_assets = {}
     temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
     temp_zip.close()
     parsed_url = urlparse(url)
@@ -710,15 +718,22 @@ def create_zip_file(html_content, assets, url, session_obj, headers, screenshots
                         filename_counter[filename] = 0
 
                     file_path = f'{asset_type}/{filename}'
-                    try:
-                        response = session_obj.get(url, timeout=10, headers=headers, verify=False)
-                        if response.status_code == 200:
-                            zipf.writestr(file_path, response.content)
-                            logger.debug(f'Added {file_path}')
-                        else:
-                            logger.warning(f'Failed to download {url}, status: {response.status_code}')
-                    except Exception as e:
-                        logger.error(f'Error downloading {url}: {str(e)}')
+                    
+                    # 1. Try to use pre-captured asset from Playwright in-memory cache
+                    if url in captured_assets and captured_assets[url]:
+                        zipf.writestr(file_path, captured_assets[url])
+                        logger.debug(f'Added {file_path} from memory cache')
+                    else:
+                        # 2. Fallback to requests download
+                        try:
+                            response = session_obj.get(url, timeout=10, headers=headers, verify=False)
+                            if response.status_code == 200:
+                                zipf.writestr(file_path, response.content)
+                                logger.debug(f'Added {file_path} via fallback request')
+                            else:
+                                logger.warning(f'Failed to download {url}, status: {response.status_code}')
+                        except Exception as e:
+                            logger.error(f'Error downloading {url}: {str(e)}')
                 except Exception as e:
                     logger.error(f'Error processing URL {url}: {str(e)}')
         if 'font_families' in assets and assets['font_families']:

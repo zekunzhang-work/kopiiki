@@ -1,0 +1,20 @@
+/* Font Family: var(--sp-font-body) */
+@import url('https://fonts.googleapis.com/css2?family=var(--sp-font-body)&display=swap');
+
+/* Font Family: var(--sp-font-mono) */
+@import url('https://fonts.googleapis.com/css2?family=var(--sp-font-mono)&display=swap');
+
+/* Font Family: ui-sans-serif */
+@import url('https://fonts.googleapis.com/css2?family=ui-sans-serif&display=swap');
+
+/* Font Family: Source Code Pro */
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap');
+
+/* Font Family: Optimistic Display */
+@import url('https://fonts.googleapis.com/css2?family=Optimistic+Display&display=swap');
+
+/* Font Family: Optimistic Text */
+@import url('https://fonts.googleapis.com/css2?family=Optimistic+Text&display=swap');
+
+/* Font Family: inherit */
+@import url('https://fonts.googleapis.com/css2?family=inherit&display=swap');
