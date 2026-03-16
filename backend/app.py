@@ -19,7 +19,7 @@ except ImportError:
 
 app = Flask(__name__)
 # Enable CORS to allow React frontend (e.g. localhost:5173) to send requests
-CORS(app)
+CORS(app, expose_headers=["Content-Disposition"])
 
 # --- Configuration (moved from old WebTwin app.py) ---
 DOWNLOAD_FOLDER = 'downloads'

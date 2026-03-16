@@ -70,13 +70,22 @@ function App() {
       a.style.display = 'none';
       a.href = downloadUrl;
 
-      // Grab filename from header if possible, else fallback
+      // Grab filename from header if possible, else fallback to domain name
       const contentDisposition = response.headers.get('Content-Disposition');
       let filename = 'extracted_site.zip';
+      
       if (contentDisposition && contentDisposition.indexOf('attachment') !== -1) {
         const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
         if (matches != null && matches[1]) {
           filename = matches[1].replace(/['"]/g, '');
+        }
+      } else {
+        // Fallback: extract domain from the user's input URL
+        try {
+          const domain = new URL(url).hostname.replace('www.', '');
+          filename = `${domain || 'extracted_site'}.zip`;
+        } catch (e) {
+          // Keep the default 'extracted_site.zip' if URL parsing fails
         }
       }
       a.download = filename;
