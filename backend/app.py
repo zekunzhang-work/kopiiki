@@ -216,6 +216,7 @@ def process_extraction(extract_id, url, output_dir, zip_path, safe_domain):
         EXTRACTION_PROGRESS[extract_id]["status"] = "complete"
         EXTRACTION_PROGRESS[extract_id]["message"] = "Extraction successful! Ready to download."
         EXTRACTION_PROGRESS[extract_id]["download_url"] = f"/api/download/{safe_domain}"
+        EXTRACTION_PROGRESS[extract_id]["filename"] = f"{safe_domain}.zip"
 
     except Exception as e:
         print(f"Extraction Error: {e}")
@@ -295,9 +296,21 @@ def api_extract_stream(extract_id):
 @app.route('/api/download/<domain>')
 def api_download(domain):
     safe_domain = secure_filename(domain)
-    zip_path = os.path.join(DOWNLOAD_FOLDER, f"{safe_domain}.zip")
+    # Support both with and without .zip extension in the URL
+    if not safe_domain.endswith('.zip'):
+        zip_filename = f"{safe_domain}.zip"
+    else:
+        zip_filename = safe_domain
+        
+    zip_path = os.path.join(DOWNLOAD_FOLDER, zip_filename)
+    
     if os.path.exists(zip_path):
-        return send_file(zip_path, as_attachment=True, download_name=f"{safe_domain}.zip")
+        return send_file(
+            zip_path, 
+            as_attachment=True, 
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
     return jsonify({"error": "File not found"}), 404
 
 @app.route('/api/extract-json', methods=['POST'])
