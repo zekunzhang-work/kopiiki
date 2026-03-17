@@ -33,3 +33,4 @@ backend.log
 .env
 .env.local
 backend/test*
+tmp_*
