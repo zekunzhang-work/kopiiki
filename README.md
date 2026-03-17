@@ -1,164 +1,66 @@
-<div align="center">
+# Kopiiki
 
-# 🔮 Kopiiki
-
-**Clone any website into a portable asset bundle — powered by Playwright.**
-
-Extract the full visual snapshot of any webpage (HTML, CSS, JS, images, fonts, metadata) into a self-contained ZIP file that renders offline.
-
-[Quick Start](#-quick-start) · [Docker](#-docker) · [How It Works](#-how-it-works) · [Output Format](#-output-format) · [Roadmap](#-roadmap)
-
-</div>
-
----
-
-## ✨ Features
-
-- **🎭 Playwright-powered** — Uses a real Chromium browser to render JavaScript, trigger lazy loading, and capture the fully hydrated DOM.
-- **📦 Complete asset extraction** — Downloads CSS, JS, images, fonts, favicons, videos, and audio referenced by the page.
-- **🧩 Component detection** — Automatically identifies navigation, headers, footers, hero sections, cards, forms, and more.
-- **📋 Metadata export** — Extracts SEO metadata, Open Graph tags, structured data (JSON-LD), and font families into `metadata.json`.
-- **🖥️ Modern UI** — Dark, minimal, high-fidelity interface built with React + Vite.
-- **🐳 Docker ready** — One command to run without installing Python or Node.js.
-
----
+A tool for extracting webpage snapshots into self-contained offline bundles.
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.9+
-- Node.js 18+
-
-### One-click launch
+Run the start script from the project root to automate environment setup and launch the services:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/kopiiki.git
 cd kopiiki
 ./start.sh
 ```
 
-The script automatically handles virtual environment creation, dependency installation, Playwright browser download, and starts both services. Open **http://localhost:5176** in your browser.
-
-### Manual setup
-
-```bash
-# Backend
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-python app.py    # Runs on port 5002
-
-# Frontend (in a new terminal)
-cd frontend
-npm install
-npm run dev      # Runs on port 5176
-```
+- **Frontend Interface**: http://localhost:5176
+- **Backend Service**: http://localhost:5002
 
 ---
 
-## 🐳 Docker
+## ⚙️ Architecture
 
-No Python or Node.js required — just Docker:
+The project uses a decoupled architecture for concurrent page rendering and asset fetching:
 
-```bash
-docker compose up
-# or
-docker build -t kopiiki . && docker run -p 5000:5000 kopiiki
+```
+[ User Browser ]
+      │
+[ Frontend (React) :5176 ] <─── Real-time Status (SSE) ───┐
+      │                                                │
+      └─── Extraction Request (POST) ───▶ [ Backend (Flask) :5002 ]
+                                              │
+                                              └──▶ [ Playwright (Chromium) ]
+                                                        │
+                                                        └──▶ [ Target Website ]
 ```
 
-Open **http://localhost:5000** and start extracting.
+- **Frontend**: Handles user interaction and visual progress tracking.
+- **Backend**: Python service managing Playwright instances for high-fidelity rendering and recursive asset parsing.
 
 ---
 
-## ⚙️ How It Works
+## 🖥️ Frontend Guide
 
-```
-┌──────────┐     POST /api/extract      ┌──────────────┐
-│  React   │ ──────────────────────────▸ │  Flask API   │
-│ Frontend │                             │   (Python)   │
-│ :5176    │ ◂────── ZIP stream ──────── │   :5002      │
-└──────────┘                             └──────┬───────┘
-                                                │
-                                    ┌───────────▼───────────┐
-                                    │  Playwright Chromium  │
-                                    │  (headless browser)   │
-                                    └───────────┬───────────┘
-                                                │
-                                    1. Navigate to URL
-                                    2. Wait for network idle
-                                    3. Disable animations
-                                    4. Scroll to trigger lazy load
-                                    5. Capture full DOM
-                                                │
-                                    ┌───────────▼───────────┐
-                                    │  Asset Extraction     │
-                                    │  (BeautifulSoup +     │
-                                    │   requests)           │
-                                    └───────────┬───────────┘
-                                                │
-                                    6. Parse HTML for asset URLs
-                                    7. Download CSS, JS, images,
-                                       fonts, videos, favicons
-                                    8. Extract metadata & components
-                                    9. Package into ZIP
-```
+Kopiiki provides a minimal interface for straightforward operations:
+
+1. **Enter URL**: Type the target website URL in the central input field.
+2. **Start Extraction**: Click the **Enter (KeyReturn)** icon on the right or press the Enter key.
+3. **Monitor Progress**: Review real-time logs in the buffer below to track asset downloads.
+4. **Cancel Job**: Click the **Stop (StopCircle)** icon at any time to abort the task.
+5. **Get Result**: A ZIP bundle containing the offline-ready snapshot will be downloaded automatically upon completion.
+
+![Frontend Interface Preview](file:///Users/zzk.wegic.js/.gemini/antigravity/brain/6489c19b-8503-4976-a5a9-4860d1a2d42f/initial_state_1773729233817.png)
 
 ---
 
-## 📁 Output Format
+## ❤️ Acknowledgements & Legal Disclaimer
 
-The downloaded ZIP contains:
+### Acknowledgements
+This project is inspired by and built upon the foundation of [**WebTwin**](https://github.com/sirioberati/WebTwin). We thank the original authors for their open-source contributions to web archival research.
 
-```
-website_extract.zip
-├── index.html          # Full rendered HTML with fixed URLs
-├── css/                # Stylesheets (external + imported)
-│   └── fonts.css       # Auto-generated Google Fonts imports
-├── js/                 # JavaScript files
-├── img/                # Images (png, jpg, svg, webp, etc.)
-├── fonts/              # Web fonts (woff2, ttf, etc.)
-├── favicons/           # Favicon files
-├── videos/             # Video assets
-├── audio/              # Audio assets
-├── components/         # Detected UI components
-│   ├── index.html      # Component viewer page
-│   ├── navigation/     # Nav components
-│   ├── header/         # Header components
-│   ├── hero/           # Hero sections
-│   ├── card/           # Card patterns
-│   └── ...
-├── metadata.json       # SEO, OG tags, structured data
-└── README.md           # Usage instructions
-```
-
-### Viewing the extracted site
-
-For best results, serve the extracted files locally:
-
-```bash
-cd extracted_site
-python3 -m http.server 8000
-# Open http://localhost:8000
-```
+### Legal Disclaimer
+1. **Intended Use**: Kopiiki is designed for personal backup, testing, research, and educational purposes ONLY.
+2. **Compliance**: Users are responsible for ensuring their usage complies with the target website's `robots.txt`, Terms of Service, and applicable copyright laws.
+3. **Liability**: The developers of Kopiiki assume no liability for any misuse of this tool, copyright infringement, or legal issues resulting from extracted content.
 
 ---
 
-## ⚠️ Disclaimer
-
-This tool is intended for **personal backup, self-testing, educational, and research purposes only**. Users are solely responsible for ensuring their use complies with:
-
-- The target website's Terms of Service and `robots.txt`
-- Applicable copyright and intellectual property laws in their jurisdiction
-- Any relevant data protection regulations
-
-The authors of Kopiiki are not responsible for any misuse of this tool.
-
----
-
-## 📄 License & Acknowledgements
-
-[MIT](LICENSE)
-
-Kopiiki is built upon the foundation of [**WebTwin**](https://github.com/sirioberati/WebTwin) by [@sirioberati](https://github.com/sirioberati) (Sirio Berati). The original WebTwin copyright is preserved in the LICENSE file. We are grateful for the open-source work that made this project possible.
+[MIT License](LICENSE)
