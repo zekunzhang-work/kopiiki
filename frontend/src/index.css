@@ -1,20 +1,13 @@
-/* --- Kopiiki ASCII Art & Paper UI Theme --- */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Paper and Ink Palette */
-  --paper-bg: #FDFBF7; /* Warm off-white */
-  --paper-grain: #f2efe9;
-  --ink-main: #1A1A1A; /* Charcoal / Off-black */
-  --ink-light: #4A4A4A;
-  --ink-accent: #0f4c81; /* Classic blue pen ink accent */
-  --ink-red: #c92a2a; /* Error state correction pen */
-  --ink-green: #2b8a3e; /* Success checkmark ink */
-
-  /* Typography */
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --bg-color: #F6F6F4;
+  --text-main: #111111;
+  --text-muted: #666666;
+  --accent: #FF5A00; /* Orange crosshair / accent */
   
-  /* Scanline dimensions */
-  --scan-height: 120px;
+  --font-serif: 'DM Serif Display', serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 * {
@@ -24,236 +17,372 @@
 }
 
 body {
-  background-color: var(--paper-bg);
-  /* Optional subtle noise/texture for paper feel */
-  background-image: radial-gradient(var(--paper-grain) 1px, transparent 1px);
-  background-size: 4px 4px;
-  
-  color: var(--ink-main);
+  background-color: var(--bg-color);
+  color: var(--text-main);
   font-family: var(--font-mono);
-  font-weight: 400;
-  /* Make text look slightly more like ink bleeding */
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
-  overflow: hidden; /* Hide scrollbars for the pure canvas feel */
+  display: flex;
+  flex-direction: column;
 }
 
 #root {
-  width: 100%;
-  height: 100%;
-  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+/* --- Layout --- */
+.app-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start; /* Title, Input, Beijing Time left align */
+  position: relative;
+  width: 100%; /* Spans the full screen horizontally */
+  max-width: 1400px;
+  margin: 0 auto; /* Optically centering a full width container */
+  padding-left: 120px; /* Symmetrical Left Border */
+  padding-right: 120px; /* Symmetrical Right Border */
+  padding-bottom: 12vh;
+}
+
+/* --- Massive Title --- */
+.hero-title {
+  font-family: var(--font-serif);
+  font-size: clamp(3.5rem, 12vw, 15rem); /* Subtly reduced to match downscaled grid */
+  line-height: 0.85;
+  letter-spacing: -0.05em;
+  text-align: left;
+  margin-bottom: 8vh;
+  position: relative;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* --- Extraction Interface --- */
+.extract-interface {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Left align */
+  width: 100%; /* Takes full width of the padded symmetric app-container */
+  text-align: left;
+  z-index: 20;
+}
+
+.crosshair-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.crosshair-icon {
+  color: var(--accent);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.coords {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  max-width: 480px;
+}
+
+.description-highlight {
+  color: var(--text-main);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 4px;
+}
+
+.input-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%; /* Fully fluid out to container edges */
+  display: flex;
+  justify-content: flex-start; /* Align inner content left too */
+  align-items: center;
+  border-bottom: 1px dotted var(--text-main);
+  padding-bottom: 0.5rem;
+  transition: border-color 0.2s ease;
+  cursor: text;
+}
+
+.input-wrapper:focus-within {
+  border-bottom-style: solid;
+}
+
+.input-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 100%;
+}
+
+.input-resizer {
+  display: inline-grid;
+  align-items: center;
+  justify-items: start;
+  width: 100%; /* Allow resizer wrapper to take width */
+}
+
+.input-resizer::after,
+.url-input {
+  width: 100%; /* Allow input to fill available space */
+  grid-area: 1 / 1;
+  font-size: 15px; /* Downscaled grid font size */
+  line-height: 20px; /* Downscaled grid line height */
+  font-family: var(--font-mono);
+  color: var(--text-main);
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  text-align: left;
+  white-space: pre; /* Keep text on single line */
+  overflow: hidden; /* Prevent visual spilling out of wrapper */
+}
+
+.url-input {
+  caret-color: transparent; /* Hide original blinking cursor */
+}
+
+.input-resizer::after {
+  content: attr(data-value) ' ';
+  visibility: hidden;
+  white-space: pre;
+}
+
+.url-input::placeholder {
+  color: #999;
+}
+
+/* --- Scanning Trail Animation --- */
+.input-resizer {
+  position: relative; /* ensure absolute positioning for scanning cursor works */
+}
+
+.scanning-trail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.trail-cell {
+  width: 8px; /* Match TerminalCursor CELL_WIDTH */
+  height: 100%;
+  background-color: rgba(215, 215, 215, 0.8); /* Match TerminalCursor FILL_COLOR */
+  opacity: 0;
+  transition: opacity 0.6s ease-out; /* Slow decay matching TUI hover */
+}
+
+.trail-cell.active {
+  opacity: 1;
+  transition: none; /* Instant snap on active hit */
+}
+
+.stop-btn {
+  color: var(--accent); /* Make Stop button distinct orange */
+  font-weight: 600;
+}
+.stop-btn:hover {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.enter-hint-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px; /* Match text */
+  cursor: pointer;
+  padding: 0 0 0 0.3rem; /* Closely attached to text */
+  margin: 0;
+  transition: color 0.2s ease;
+  display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* --- The Cloud-like ASCII Title --- */
-.ascii-title-container {
-  position: absolute;
-  top: 15%;
-  text-align: center;
-  white-space: pre; /* absolute necessity for ASCII */
-  font-size: min(1.5vw, 14px);
-  line-height: 1.1;
-  font-weight: 700;
-  user-select: none;
-  
-  /* The cloudy hover effect */
-  animation: floatCloud 8s ease-in-out infinite alternate;
+.enter-hint-btn:hover {
+  color: var(--text-main);
 }
 
-.ascii-title {
-  position: relative;
-  color: var(--ink-main);
-  /* The retro ghosting / typewriter bleed effect */
-  text-shadow: 
-    -1px 0 2px rgba(26,26,26,0.2), 
-    1px 0 3px rgba(26,26,26,0.1),
-    0 1px 1px rgba(26,26,26,0.1);
-}
-
-@keyframes floatCloud {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(10px, -5px) scale(1.02); }
-  100% { transform: translate(-5px, 5px) scale(0.98); }
-}
-
-
-/* --- Markdown UI / Terminal Container --- */
-.markdown-terminal {
-  position: relative;
-  z-index: 10;
-  margin-top: 15vh; /* Push below title */
-  width: 100%;
-  max-width: 800px;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 1.1rem;
-}
-
-/* --- Input Area --- */
-.input-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  width: 100%;
-}
-
-.ascii-input-wrapper {
-  display: flex;
-  align-items: center;
-  font-size: 1.2rem;
-  color: var(--ink-main);
-}
-
-.ascii-input-wrapper span {
-  white-space: pre;
-}
-
-.ascii-input {
+.submit-btn {
   background: transparent;
   border: none;
-  outline: none;
-  color: var(--ink-accent);
+  color: var(--text-main);
   font-family: var(--font-mono);
-  font-size: 1.2rem;
-  width: 400px;
-  margin: 0 0.5rem;
-  border-bottom: 2px dashed var(--ink-light);
-  padding-bottom: 2px;
-  text-align: center;
-}
-.ascii-input::placeholder {
-  color: rgba(74, 74, 74, 0.4);
-}
-.ascii-input:focus {
-  border-bottom-style: solid;
-}
-
-/* --- Button --- */
-.ascii-btn {
-  background: transparent;
-  border: none;
-  color: var(--ink-main);
-  font-family: var(--font-mono);
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  white-space: pre;
-  transition: all 0.2s;
-}
-.ascii-btn:hover:not(:disabled) {
-  color: var(--ink-accent);
-  transform: scale(1.05);
-  text-shadow: 0 0 5px rgba(15, 76, 129, 0.3);
-}
-.ascii-btn:disabled {
-  color: var(--ink-light);
-  cursor: not-allowed;
-  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1rem;
+  transition: opacity 0.2s ease;
 }
 
-/* --- Progress Log / Typewriter --- */
-.progress-log {
-  margin-top: 3rem;
+.submit-btn:hover:not(:disabled) {
+  opacity: 0.7;
+}
+
+.submit-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Status & Stream Buffer --- */
+.status-container {
+  margin-top: 2rem;
   width: 100%;
-  max-width: 600px;
+  height: 90px; /* Fixed height! Exactly 5 lines of 18px text */
+  overflow: hidden; /* Hide old logs that scroll up */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Push logs to the bottom, causing oldest to vanish upward */
+  font-size: 13px; /* Downscaled grid font size */
+  line-height: 18px; /* Downscaled line height */
+  color: var(--text-muted);
   text-align: left;
-  line-height: 1.8;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.status-container.visible {
+  opacity: 1;
+}
+
+.stream-buffer-view {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Align bottom to top */
+  width: 100%;
 }
 
 .log-line {
   display: flex;
-  margin-bottom: 0.5rem;
-  animation: typingFadeIn 0.3s ease-out forwards;
-  opacity: 0;
-}
-
-.log-prefix {
-  color: var(--ink-light);
-  margin-right: 1rem;
-}
-
-.log-msg {
-  flex: 1;
-}
-
-.log-status {
-  font-weight: 700;
-  margin-left: 1rem;
-}
-.log-status.processing { color: var(--ink-accent); }
-.log-status.complete { color: var(--ink-green); }
-.log-status.error { color: var(--ink-red); }
-
-@keyframes typingFadeIn {
-  to { opacity: 1; }
-}
-
-/* --- Success State layout --- */
-.success-view {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  text-align: center;
-}
-.success-view pre {
-  color: var(--ink-green);
-  font-size: 1.5rem;
+  width: 100%;
 }
 
-/* --- Scanline Overlay (The Copier Effect) --- */
-.scanline-overlay {
+.log-prefix, .log-spinner {
+  width: 70px; /* Monospace block width for "[ OK  ]" */
+  flex-shrink: 0;
+  display: inline-block;
+  white-space: pre;
+}
+
+.log-message {
+  flex-grow: 1;
+  white-space: pre-wrap;
+}
+
+.log-cursor {
+  animation: blink 1s step-end infinite;
+  display: inline-block;
+  margin-left: 2px;
+}
+
+
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.dynamic-footer {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   width: 100%;
-  height: 100vh;
-  pointer-events: none;
+  padding: 40px 120px; /* Snap grid Y: 2 blocks height, Snap grid X: 120px */
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end; /* Align all to the bottom baseline */
+  font-size: 13px; /* Smaller text decoupled from grid */
+  line-height: 18px;
+  font-family: var(--font-mono); 
+  font-weight: 500;
+  text-transform: uppercase;
+  z-index: 30;
+}
+
+.footer-center {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex: 1; /* Allow center to take up middle space */
+}
+
+.footer-links {
+  display: flex;
+  gap: 48px; /* Snap grid X: exactly 4 character widths */
+}
+
+.footer-link {
+  color: var(--text-main);
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-underline-offset: 4px;
+}
+
+.footer-year {
+  color: var(--text-muted);
+}
+
+/* --- Top Navigation --- */
+.top-nav {
+  position: absolute; /* Relative to app-container, same ref as footer */
+  top: 40px; /* Snap Y */
+  right: 120px; /* Same as footer padding-right — both now reference app-container */
+  display: flex;
+  gap: 36px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  text-transform: uppercase;
   z-index: 50;
-  overflow: hidden;
 }
 
-.scanline {
-  position: absolute;
-  width: 100%;
-  height: var(--scan-height);
-  /* The scan beam: transparent -> ink-light color -> transparent */
-  background: linear-gradient(
-    to bottom,
-    rgba(26,26,26,0) 0%,
-    rgba(26,26,26,0.03) 50%,
-    rgba(15,76,129,0.08) 95%,
-    rgba(26,26,26,0.15) 100%
-  );
-  top: -100px; /* Start above screen */
-  animation: scanSweep 4s linear infinite;
+.nav-link {
+  color: var(--text-main);
+  text-decoration: underline;
+  text-decoration-style: solid;
+  text-underline-offset: 4px;
+  transition: opacity 0.2s ease;
 }
 
-/* The horizontal ASCII grid overlay */
-.scan-grid {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    linear-gradient(rgba(26, 26, 26, 0.04) 1px, transparent 1px);
-  background-size: 100% 4px;
-  opacity: 0.5;
-}
-
-@keyframes scanSweep {
-  0% { top: -20vh; }
-  100% { top: 120vh; }
+.nav-link:hover {
+  opacity: 0.7;
 }

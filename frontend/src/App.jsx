@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './index.css';
 
-import AsciiTitle from './components/AsciiTitle';
-import ScanlineOverlay from './components/ScanlineOverlay';
-import MarkdownTerminal from './components/MarkdownTerminal';
+import ExtractInterface from './components/ExtractInterface';
+import DynamicFooter from './components/DynamicFooter';
+import TerminalCursor from './components/TerminalCursor';
+import TopNav from './components/TopNav';
 
 function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isError, setIsError] = useState(false);
   const [logs, setLogs] = useState([]);
   const [result, setResult] = useState(false);
+  
+  // Ref to hold the current EventSource and AbortController for cancellation
+  const abortCtrlRef = React.useRef(null);
+  const eventSourceRef = React.useRef(null);
 
   // Helper to append formatting logs
   const appendLog = (msgObj) => {
@@ -20,7 +25,11 @@ function App() {
     setIsLoading(true);
     setIsError(false);
     setResult(false);
-    setLogs([{ status: 'sys', message: `INITIATING CONNECTION TO ${url}...` }]);
+    setLogs([{ status: 'sys', message: `INITIATING EXTRACTION OF ${url}` }]);
+
+    // Setup cancellation tokens
+    const abortCtrl = new AbortController();
+    abortCtrlRef.current = abortCtrl;
 
     try {
       // In dev mode, default to localhost:5002 if no env is set
@@ -32,6 +41,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url }),
+        signal: abortCtrl.signal,
       });
 
       if (!startResponse.ok) {
@@ -43,6 +53,7 @@ function App() {
       
       // 2. Connect to the SSE stream using the ID
       const eventSource = new EventSource(`${apiBase}/api/extract/stream/${extract_id}`);
+      eventSourceRef.current = eventSource;
       
       eventSource.onmessage = (event) => {
         try {
@@ -85,28 +96,47 @@ function App() {
       eventSource.onerror = () => {
         eventSource.close();
         setIsError(true);
-        appendLog({ status: 'error', message: "CONNECTION TO SERVER LOST. ABORTING." });
+        appendLog({ status: 'error', message: "CONNECTION LOST. ABORTED." });
         setIsLoading(false);
       };
 
     } catch (err) {
-      appendLog({ status: 'error', message: `FATAL EXCEPTION: ${err.message}` });
+      if (err.name === 'AbortError') {
+        appendLog({ status: 'error', message: "EXTRACTION ABORTED BY USER." });
+      } else {
+        appendLog({ status: 'error', message: `EXCEPTION: ${err.message}` });
+      }
       setIsError(true);
       setIsLoading(false);
     }
   };
 
+  const handleCancel = () => {
+    if (abortCtrlRef.current) {
+      abortCtrlRef.current.abort();
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    setIsLoading(false);
+    setIsError(true); // Treat cancellation as an error state for UI bounds
+    appendLog({ status: 'error', message: "EXTRACTION ABORTED BY USER." });
+  };
+
   return (
     <div className="app-container">
-      <ScanlineOverlay active={isLoading} />
-      <AsciiTitle />
-      <MarkdownTerminal 
+      <TopNav />
+      <TerminalCursor />
+      <h1 className="hero-title">Kopiiki</h1>
+      <ExtractInterface 
         onExtract={handleExtract} 
+        onCancel={handleCancel}
         isLoading={isLoading} 
         logs={logs} 
         result={result} 
         isError={isError} 
       />
+      <DynamicFooter />
     </div>
   );
 }
