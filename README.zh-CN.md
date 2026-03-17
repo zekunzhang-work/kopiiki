@@ -47,7 +47,7 @@ Kopiiki 提供了一个直观的操作界面，用户只需简单的步骤即可
 4. **取消操作**: 在提取过程中，您可以点击右侧的 **停止 (StopCircle)** 图标随时中断提取任务。
 5. **获取结果**: 提取完成后，系统会自动生成并触发下载一个包含完整网页资源的 ZIP 压缩包。
 
-![前端操作界面预览](file:///Users/zzk.wegic.js/.gemini/antigravity/brain/6489c19b-8503-4976-a5a9-4860d1a2d42f/initial_state_1773729233817.png)
+![前端操作界面预览](docs/assets/preview.png)
 
 ---
 

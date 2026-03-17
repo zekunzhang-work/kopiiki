@@ -47,7 +47,7 @@ Kopiiki provides a minimal interface for straightforward operations:
 4. **Cancel Job**: Click the **Stop (StopCircle)** icon at any time to abort the task.
 5. **Get Result**: A ZIP bundle containing the offline-ready snapshot will be downloaded automatically upon completion.
 
-![Frontend Interface Preview](file:///Users/zzk.wegic.js/.gemini/antigravity/brain/6489c19b-8503-4976-a5a9-4860d1a2d42f/initial_state_1773729233817.png)
+![Frontend Interface Preview](docs/assets/preview.png)
 
 ---
 
