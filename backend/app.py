@@ -25,7 +25,15 @@ app = Flask(__name__)
 CORS(app, expose_headers=["Content-Disposition"])
 
 # Global map to store progress for SSE
+
+# Global map to store progress for SSE
 EXTRACTION_PROGRESS = {}
+
+from threading import Lock, Event
+EXTRACTION_LOCK = Lock()
+ACTIVE_EXTRACTION_ID = None
+CANCEL_TOKEN = Event()
+
 
 # --- Configuration (moved from old WebTwin app.py) ---
 DOWNLOAD_FOLDER = 'downloads'
@@ -105,7 +113,7 @@ def extract_with_playwright(url, output_dir, extract_id=None):
             if response and not response.ok:
                  print(f"[{threading.current_thread().name}] Warning: Page returned status {response.status}")
                  
-            # 1. Disable animations immediately via injected CSS (with ID for easy removal)
+            # 1. Define reusable crawling function
             disable_animation_css = """
             * {
                 animation-duration: 0.001s !important;
@@ -114,16 +122,7 @@ def extract_with_playwright(url, output_dir, extract_id=None):
                 transition-delay: 0s !important;
             }
             """
-            page.add_style_tag(content=disable_animation_css)
-            # Find the just-added style tag and give it an ID
-            page.evaluate("""() => {
-                const styles = document.querySelectorAll('style');
-                const lastStyle = styles[styles.length - 1];
-                if (lastStyle) lastStyle.id = 'kopiiki-animation-freezer';
-            }""")
             
-            
-            # 2. Emulate scroll to trigger lazy loading
             scroll_script = """
             async () => {
                 await new Promise((resolve) => {
@@ -133,31 +132,95 @@ def extract_with_playwright(url, output_dir, extract_id=None):
                         const scrollHeight = document.body.scrollHeight;
                         window.scrollBy(0, distance);
                         totalHeight += distance;
-
-                        if(totalHeight >= scrollHeight){
+                        if (totalHeight >= scrollHeight - window.innerHeight) {
                             clearInterval(scrollInterval);
-                            window.scrollTo(0, 0); // Scroll back to top
                             resolve();
                         }
-                    }, 200);
+                    }, 100);
                 });
             }
             """
-            update_progress("Scrolling page to trigger lazy-loaded images & scripts...")
-            print(f"[{threading.current_thread().name}] Scrolling to trigger lazy loading...")
-            page.evaluate(scroll_script)
+
+            def crawl_page(target_url, is_main=False):
+                if not is_main:
+                    update_progress(f"Crawling level-1 subpage: {target_url}...")
+                    try:
+                        page.goto(target_url, wait_until="networkidle", timeout=timeout * 1000)
+                    except Exception:
+                        pass
+                
+                page.add_style_tag(content=disable_animation_css)
+                page.evaluate("""() => {
+                    const styles = document.querySelectorAll('style');
+                    const lastStyle = styles[styles.length - 1];
+                    if (lastStyle) lastStyle.id = 'kopiiki-animation-freezer';
+                }""")
+                
+                if is_main:
+                    update_progress("Scanning for hidden mobile menus (Hamburger)...")
+                    page.evaluate("""() => {
+                        const menuSelectors = [
+                            '[aria-label*="menu" i]', 
+                            '[class*="hamburger" i]', 
+                            '[class*="menu-toggle" i]', 
+                            '[id*="hamburger" i]',
+                            '[class*="navbar-toggler" i]',
+                            '.w-nav-button'
+                        ];
+                        for (let sel of menuSelectors) {
+                            const btns = document.querySelectorAll(sel);
+                            for (let btn of btns) {
+                                if (btn && btn.offsetParent !== null) { // if visible
+                                    try { btn.click(); } catch(e) {}
+                                }
+                            }
+                        }
+                    }""")
+                    page.wait_for_timeout(1000)
+                    
+                    update_progress("Scrolling to trigger lazy-loaded elements...")
+                page.evaluate(scroll_script)
+                page.wait_for_timeout(2000)
+                
+                html_raw = page.content()
+                import re
+                return re.sub(r'<style id="kopiiki-animation-freezer">.*?</style>', '', html_raw, flags=re.DOTALL)
+
+            html_results = {}
+            main_html = crawl_page(url, is_main=True)
+            html_results[url] = main_html
             
-            # Short wait to let the last triggered images network requests settle
-            page.wait_for_timeout(2000)
-            
-            # Fetch the final static DOM snapshot
-            html_content = page.content()
-            
-            # Remove the freezing CSS so the downloaded HTML retains animations
-            import re
-            html_content = re.sub(r'<style id="kopiiki-animation-freezer">.*?</style>', '', html_content, flags=re.DOTALL)
-            
-            print(f"[{threading.current_thread().name}] Extraction completed. HTML length: {len(html_content)}. Captured {len(captured_assets)} assets in memory.")
+            update_progress("Analyzing DOM for top-level navigation routes...")
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(main_html, "html.parser")
+            from urllib.parse import urljoin, urlparse
+            base_domain = urlparse(url).netloc
+            normalized_start = url.rstrip('/')
+
+            urls_to_crawl = []
+            for a in soup.select("nav a, header a, .navbar a, blockquote a, [role='navigation'] a, [class*='menu'] a, [class*='sidebar'] a, .w-nav-link"):
+                if CANCEL_TOKEN.is_set(): break
+                href = a.get("href")
+                if not href: continue
+                full_url = urljoin(url, href)
+                parsed_full = urlparse(full_url)
+                if parsed_full.netloc != base_domain: continue
+                if parsed_full.fragment: continue
+                if parsed_full.path.startswith("mailto:") or parsed_full.path.startswith("tel:"): continue
+                
+                normalized_full = full_url.rstrip('/')
+                if normalized_full != normalized_start and normalized_full not in [u.rstrip('/') for u in urls_to_crawl]:
+                    urls_to_crawl.append(full_url)
+                    if len(urls_to_crawl) >= 6: # Limit shadow depth to 6 sub-pages
+                        break
+                        
+            for idx, sub_url in enumerate(urls_to_crawl):
+                if CANCEL_TOKEN.is_set(): break
+                try:
+                    sub_html = crawl_page(sub_url)
+                    html_results[sub_url] = sub_html
+                except Exception as e:
+                    print(f"Failed to crawl {sub_url}: {str(e)}")
 
         except PlaywrightTimeoutError:
              error_msg = f"Timeout loading {url} within {timeout} seconds."
@@ -172,7 +235,7 @@ def extract_with_playwright(url, output_dir, extract_id=None):
     if error_msg:
         raise Exception(error_msg)
         
-    return html_content, captured_assets
+    return html_results, captured_assets
 
 def create_zip_from_dir(source_dir, zip_filename):
     zipf = zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED)
@@ -186,28 +249,17 @@ def create_zip_from_dir(source_dir, zip_filename):
 
 def process_extraction(extract_id, url, output_dir, zip_path, safe_domain):
     try:
+        if CANCEL_TOKEN.is_set():
+            raise Exception("Cancelled by user")
         EXTRACTION_PROGRESS[extract_id]["message"] = "Initializing extraction pipeline..."
         
         # 1. First extract the dynamic rendered HTML freezing animations, AND intercept all assets
-        raw_html_content, captured_assets = extract_with_playwright(url, output_dir, extract_id=extract_id)
+        html_results, captured_assets = extract_with_playwright(url, output_dir, extract_id=extract_id)
         
-        # 2. Fix all relative links directly using the legacy BS4 logic
-        EXTRACTION_PROGRESS[extract_id]["message"] = "Patching relative URL references in HTML..."
-        print(f"[{threading.current_thread().name}] Fixing relative URL references...")
-        fixed_html = fix_relative_urls(raw_html_content, url)
-        
-        # 3. Use unified session for fast asset download (Fallback only)
-        session_obj = requests.Session()
-        headers = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36' }
-        
-        # 4. Parse HTML to find asset structure, but pass the captured assets
-        EXTRACTION_PROGRESS[extract_id]["message"] = "Parsing HTML to map dependencies and assets..."
-        print(f"[{threading.current_thread().name}] Parsing HTML for asset logic...")
-        assets = extract_assets(fixed_html, url, session_obj=session_obj, headers=headers, captured_assets=captured_assets)
-        
-        # 5. Pack the HTML and all discovered fetched assets straight into a fully fledged ZIP
+        # 2. Pack the HTML and all discovered fetched assets straight into a fully fledged ZIP
+        if CANCEL_TOKEN.is_set(): raise Exception("Cancelled by user")
         EXTRACTION_PROGRESS[extract_id]["message"] = "Packaging everything into a downloadable ZIP archive..."
-        zip_path_tmp = create_zip_file(fixed_html, assets, url, session_obj, headers, captured_assets=captured_assets)
+        zip_path_tmp = create_zip_file(html_results, captured_assets, url, output_dir, extract_id)
         
         # 6. Copy over to persistent download folder
         shutil.copy2(zip_path_tmp, zip_path)
@@ -346,3 +398,17 @@ if __name__ == '__main__':
     # threaded=False and debug=False are CRITICAL for sync_playwright
     app.run(host='0.0.0.0', port=port, debug=False, threaded=False)
 
+
+@app.route('/api/extract/cancel', methods=['POST'])
+def cancel_extraction():
+    data = request.json or {}
+    extract_id = data.get('extract_id')
+    global ACTIVE_EXTRACTION_ID
+    with EXTRACTION_LOCK:
+        if ACTIVE_EXTRACTION_ID == extract_id:
+            CANCEL_TOKEN.set()
+            if extract_id in EXTRACTION_PROGRESS:
+                EXTRACTION_PROGRESS[extract_id]["status"] = "cancelled"
+                EXTRACTION_PROGRESS[extract_id]["message"] = "Cancelled by user."
+            return jsonify({"message": "Cancellation signal sent."})
+        return jsonify({"message": "No matching active extraction found."}), 404
