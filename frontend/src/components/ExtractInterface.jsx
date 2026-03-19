@@ -8,11 +8,17 @@ const spinnerFrames = ['[ \\ ]', '[ | ]', '[ / ]', '[ - ]'];
 const ScanningTrail = ({ text }) => {
   const [headIndex, setHeadIndex] = useState(0);
   const [direction, setDirection] = useState(1);
+  const [totalCells, setTotalCells] = useState(20);
+  const measureRef = React.useRef(null);
   
-  // Calculate how many 8px cells are needed to cover the string.
-  // We use a minimum of 20 cells (placeholder length roughly)
-  const logicalLength = Math.max(text.length, 20);
-  const totalCells = logicalLength; 
+  useEffect(() => {
+    if (measureRef.current) {
+        const width = measureRef.current.getBoundingClientRect().width;
+        // Each cell is exactly 8px wide. Calculate precise required cell count to cover text width.
+        const cells = Math.max(Math.ceil(width / 8), 1);
+        setTotalCells(cells);
+    }
+  }, [text]);
 
   useEffect(() => {
     const sweepInterval = setInterval(() => {
@@ -34,14 +40,24 @@ const ScanningTrail = ({ text }) => {
   }, [direction, totalCells]);
 
   return (
-    <div className="scanning-trail">
-      {Array.from({ length: totalCells }).map((_, i) => (
-        <div 
-          key={i} 
-          className={`trail-cell ${i === headIndex ? 'active' : ''}`}
-        />
-      ))}
-    </div>
+    <>
+      {/* Hidden layout span to perfectly mirror the input font sizing and measure exact pixel width */}
+      <span 
+        ref={measureRef} 
+        className="url-input" 
+        style={{ position: 'absolute', visibility: 'hidden', whiteSpace: 'pre', width: 'auto', padding: 0, margin: 0, border: 'none', pointerEvents: 'none' }}
+      >
+        {text || "Enter URL to extract."}
+      </span>
+      <div className="scanning-trail">
+        {Array.from({ length: totalCells }).map((_, i) => (
+          <div 
+            key={i} 
+            className={`trail-cell ${i === headIndex ? 'active' : ''}`}
+          />
+        ))}
+      </div>
+    </>
   );
 };
 

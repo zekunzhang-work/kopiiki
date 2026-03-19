@@ -15,10 +15,14 @@ function App() {
   // Ref to hold the current EventSource and AbortController for cancellation
   const abortCtrlRef = React.useRef(null);
   const eventSourceRef = React.useRef(null);
+  const extractIdRef = React.useRef(null);
 
   // Helper to append formatting logs
   const appendLog = (msgObj) => {
-    setLogs(prev => [...prev, msgObj]);
+    setLogs(prev => {
+      const newLogs = [...prev, msgObj];
+      return newLogs.slice(-200);
+    });
   };
 
   const handleExtract = async (url) => {
@@ -49,7 +53,9 @@ function App() {
         throw new Error(errorData.error || `Server responded with ${startResponse.status}`);
       }
       
-      const { extract_id } = await startResponse.json();
+      const resData = await startResponse.json();
+      const extract_id = resData.extract_id;
+      extractIdRef.current = extract_id;
       
       // 2. Connect to the SSE stream using the ID
       const eventSource = new EventSource(`${apiBase}/api/extract/stream/${extract_id}`);
@@ -63,7 +69,7 @@ function App() {
           setLogs(prev => {
             // Avoid duplicate exact messages in a row
             if (prev.length > 0 && prev[prev.length - 1].message === data.message) return prev;
-            return [...prev, { status: data.status, message: data.message }];
+            return [...prev, { status: data.status, message: data.message }].slice(-200);
           });
           
           if (data.status === 'complete') {
@@ -111,7 +117,7 @@ function App() {
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (abortCtrlRef.current) {
       abortCtrlRef.current.abort();
     }
@@ -121,6 +127,19 @@ function App() {
     setIsLoading(false);
     setIsError(true); // Treat cancellation as an error state for UI bounds
     appendLog({ status: 'error', message: "EXTRACTION ABORTED BY USER." });
+
+    if (extractIdRef.current) {
+      try {
+        const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5002';
+        await fetch(`${apiBase}/api/extract/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ extract_id: extractIdRef.current })
+        });
+      } catch (err) {
+        console.error("Cancel failed", err);
+      }
+    }
   };
 
   return (
