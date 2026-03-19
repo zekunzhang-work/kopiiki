@@ -29,8 +29,9 @@ Thumbs.db
 nohup.out
 backend.log
 
-# Environment
+# Environment & Private Configs
 .env
 .env.local
 backend/test*
 tmp_*
+agent.md
