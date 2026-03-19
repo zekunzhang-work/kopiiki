@@ -2,9 +2,15 @@
 
 A tool for extracting webpage snapshots into self-contained offline bundles.
 
-## 🚀 Quick Start
+## 🚀 Quick Start (GUI Mode)
 
-Run the start script from the project root to automate environment setup and launch the services:
+For a seamless out-of-the-box experience with a Terminal User Interface (TUI) and visual progress bars, use the included bootstrap script.
+
+The `start.sh` script is a foolproof initiator that:
+1. Validates your Python 3 and Node.js environments.
+2. Automatically installs backend (`pip`) and frontend (`npm`) dependencies.
+3. Automatically downloads the Playwright Chromium binaries required for headless extraction.
+4. Concurrently boots the Flask backend (`:5002`) and Vite frontend (`:5176`).
 
 ```bash
 cd kopiiki
@@ -16,38 +22,52 @@ cd kopiiki
 
 ---
 
+## 🤖 CLI & AI Agent Integration
+
+Kopiiki is fundamentally designed as an **Upstream Data-Ingestion Pipeline for AI Agents** (such as Cursor, Claude Code, Aider, etc.). 
+
+If you or your autonomous Agent prefer to run Kopiiki without the GUI overhead, a dedicated CLI wrapper is available.
+
+### Manual CLI Usage
+You can invoke the extraction pipeline directly from your terminal:
+```bash
+# 1. Enter the backend directory
+cd kopiiki/backend
+
+# 2. Activate the Python virtual environment
+source venv/bin/activate
+
+# 3. Execute the crawler targeting your desired URL
+python cli.py https://example.com/
+```
+The engine will boot a headless Chromium instance, sniff up to 6 topological sub-pages, map and stitch the AST, and silently drop the assembled `[domain].zip` into `kopiiki/backend/downloads/`.
+
+### AI Agent Workflow
+LLM Autonomous Agents can perfectly slot Kopiiki into their CI/CD or codebase refactoring routines:
+1. The Agent executes the shell command `python cli.py <URL>`.
+2. Upon success, the Agent executes `unzip downloads/<domain>.zip -d ./working_dir`.
+3. The Agent reads the dynamically generated `README.md` and the perfectly-linked, offline-first `.html` components to establish a ground-truth layout layout reference for producing React/Tailwind code.
+
+---
+
 ## ⚙️ Architecture
 
 The project uses a decoupled architecture for concurrent page rendering and asset fetching:
 
 ```
-[ User Browser ]
+[ User Browser / AI Agent ]
       │
 [ Frontend (React) :5176 ] <─── Real-time Status (SSE) ───┐
       │                                                │
       └─── Extraction Request (POST) ───▶ [ Backend (Flask) :5002 ]
                                               │
-                                              └──▶ [ Playwright (Chromium) ]
+                                              └──▶ [ Playwright (Chromium) / CLI script ]
                                                         │
                                                         └──▶ [ Target Website ]
 ```
 
 - **Frontend**: Handles user interaction and visual progress tracking.
-- **Backend**: Python service managing Playwright instances for high-fidelity rendering and recursive asset parsing.
-
----
-
-## 🖥️ Frontend Guide
-
-Kopiiki provides a minimal interface for straightforward operations:
-
-1. **Enter URL**: Type the target website URL in the central input field.
-2. **Start Extraction**: Click the **Enter (KeyReturn)** icon on the right or press the Enter key.
-3. **Monitor Progress**: Review real-time logs in the buffer below to track asset downloads.
-4. **Cancel Job**: Click the **Stop (StopCircle)** icon at any time to abort the task.
-5. **Get Result**: A ZIP bundle containing the offline-ready snapshot will be downloaded automatically upon completion.
-
-![Frontend Interface Preview](docs/assets/preview.png)
+- **Backend**: Python service managing Playwright instances for high-fidelity rendering, native navigation sniffing, and AST rewriting for true offline local mapping.
 
 ---
 
