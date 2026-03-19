@@ -22,7 +22,7 @@ cd kopiiki
 
 ## 🤖 CLI & AI Agent Integration
 
-Kopiiki can be used as a data-ingestion pipeline for AI agents (such as Cursor, Claude Code, Aider, etc.). 
+Kopiiki can be used as a data-ingestion pipeline for AI agents (such as Cursor, Claude Code, etc.). 
 
 A dedicated CLI script is provided for headless execution.
 
@@ -56,7 +56,7 @@ The project uses a decoupled architecture for concurrent page rendering and asse
 [ User Browser / AI Agent ]
       │
 [ Frontend (React) :5176 ] <─── Real-time Status (SSE) ───┐
-      │                                                │
+      │                                                   │
       └─── Extraction Request (POST) ───▶ [ Backend (Flask) :5002 ]
                                               │
                                               └──▶ [ Playwright (Chromium) / CLI script ]

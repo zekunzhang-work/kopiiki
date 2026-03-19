@@ -22,7 +22,7 @@ cd kopiiki
 
 ## 🤖 CLI 与 AI Agent 集成
 
-Kopiiki 可作为 AI Agent（如 Cursor、Claude Code、Aider 等）的数据处理管道。项目中包含了一个用于命令行环境的独立运行脚本。
+Kopiiki 可作为 AI Agent（如 Cursor、Claude Code 等）的数据处理管道。项目中包含了一个用于命令行环境的独立运行脚本。
 
 ### 命令行（CLI）使用方法
 可以在终端中直接调用提取流程：
@@ -54,7 +54,7 @@ python cli.py https://example.com/
 [ 用户终端 / AI Agent ]
       │
 [ 前端 (React) :5176 ] <─── 实时进度状态 (SSE) ───┐
-      │                                       │
+      │                                        │
       └─── 提取请求 (POST) ───▶ [ 后端 (Flask) :5002 ]
                                      │
                                      └──▶ [ Playwright (Chromium) / CLI script ]
