@@ -28,7 +28,11 @@ command -v python3 >/dev/null 2>&1 || fail "Python 3 is required but not install
 ok "Python 3 found: $(python3 --version 2>&1)"
 
 command -v node >/dev/null 2>&1 || fail "Node.js is required but not installed."
-ok "Node.js found: $(node --version)"
+NODE_VERSION="$(node -p "process.versions.node")"
+if ! node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(((major === 20 && minor >= 19) || (major === 22 && minor >= 12) || major > 22) ? 0 : 1);"; then
+    fail "Node.js 20.19+ or 22.12+ is required by Vite. Found: v$NODE_VERSION"
+fi
+ok "Node.js found: v$NODE_VERSION"
 
 command -v npm >/dev/null 2>&1 || fail "npm is required but not installed."
 ok "npm found: $(npm --version)"

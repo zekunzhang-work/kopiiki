@@ -20,6 +20,16 @@ import html
 logger = logging.getLogger('kopiiki.assets')
 cssutils.log.setLevel(logging.CRITICAL)   # suppress noisy cssutils warnings
 
+
+class ExtractionCancelled(Exception):
+    """Raised when a user-requested cancellation stops extraction work."""
+
+
+def ensure_not_cancelled(cancel_event):
+    if cancel_event and cancel_event.is_set():
+        raise ExtractionCancelled("Cancelled by user")
+
+
 # ── Constants ────────────────────────────────────────────
 USER_AGENTS = [
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
@@ -754,21 +764,36 @@ def rewrite_css_urls(css_content, url_mapping):
     import re
     return re.sub(r'url\((.*?)\)', replace_url, css_content)
 
-def create_zip_file(html_results, captured_assets, start_url, output_dir, extract_id):
+def create_zip_file(
+    html_results,
+    captured_assets,
+    start_url,
+    output_dir,
+    extract_id,
+    temp_zip_path=None,
+    cancel_event=None,
+):
     import tempfile, uuid, os, json, re, zipfile, requests
     from bs4 import BeautifulSoup
     from urllib.parse import urlparse, urljoin, unquote
     from datetime import datetime
-    
+        
     if isinstance(html_results, str):
         html_results = {start_url: html_results}
+
+    ensure_not_cancelled(cancel_event)
+    if temp_zip_path is None:
+        temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+        temp_zip_path = temp_zip.name
+        temp_zip.close()
+    else:
+        os.makedirs(os.path.dirname(temp_zip_path), exist_ok=True)
         
-    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-    
     page_files = {}
     url_mapping = {}
-    
+        
     for page_url, html in html_results.items():
+        ensure_not_cancelled(cancel_event)
         if page_url == start_url or page_url.rstrip('/') == start_url.rstrip('/'):
             page_files[page_url] = "index.html"
             url_mapping[page_url] = "./index.html"
@@ -786,8 +811,9 @@ def create_zip_file(html_results, captured_assets, start_url, output_dir, extrac
 
     global_assets = {'css': set(), 'js': set(), 'img': set(), 'fonts': set(), 'favicons': set(), 'videos': set(), 'audio': set()}
     components_dump = {}
-    
+        
     for page_url, html in html_results.items():
+        ensure_not_cancelled(cancel_event)
         # Pass session to extract_assets to maintain global persistence
         page_assets = extract_assets(html, page_url, session_obj=session_obj, headers=headers, captured_assets=captured_assets)
         for k in global_assets.keys():
@@ -802,6 +828,7 @@ def create_zip_file(html_results, captured_assets, start_url, output_dir, extrac
 
     for asset_type, urls in global_assets.items():
         for asset_url in urls:
+            ensure_not_cancelled(cancel_event)
             formatted_url = urljoin(start_url, asset_url)
             if not formatted_url.startswith(('http://', 'https://')): continue
                 
@@ -834,30 +861,40 @@ def create_zip_file(html_results, captured_assets, start_url, output_dir, extrac
                 downloaded_buffers[file_path] = captured_assets[asset_url]
             else:
                 try:
+                    ensure_not_cancelled(cancel_event)
                     response = session_obj.get(formatted_url, timeout=10, headers=headers, verify=False)
+                    ensure_not_cancelled(cancel_event)
                     if response.status_code == 200: downloaded_buffers[file_path] = response.content
+                except ExtractionCancelled:
+                    raise
                 except Exception:
                     pass
 
-    with zipfile.ZipFile(temp_zip.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    ensure_not_cancelled(cancel_event)
+    with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for page_url, html in html_results.items():
+            ensure_not_cancelled(cancel_event)
             final_html = rewrite_html_dom(html, url_mapping, page_url)
             zipf.writestr(page_files[page_url], final_html)
-            
+                
         for file_path, content in downloaded_buffers.items():
+            ensure_not_cancelled(cancel_event)
             if file_path.startswith("css/"):
                 content = rewrite_css_urls(content, url_mapping)
             zipf.writestr(file_path, content)
-            
+                
         for asset_type in ['css', 'js', 'img', 'fonts', 'favicons', 'videos', 'audio']:
+            ensure_not_cancelled(cancel_event)
             zipf.writestr(f'{asset_type}/.gitkeep', '')
-            
+                
         if components_dump:
             zipf.writestr('components/.gitkeep', '')
             for (component_type, components) in components_dump.items():
+                ensure_not_cancelled(cancel_event)
                 if components:
                     zipf.writestr(f'components/{component_type}/.gitkeep', '')
                     for (i, component) in enumerate(components):
+                        ensure_not_cancelled(cancel_event)
                         html_code = component.get('html', '')
                         if html_code:
                             zipf.writestr(f'components/{component_type}/component_{i + 1}.html', html_code)
@@ -877,8 +914,7 @@ def create_zip_file(html_results, captured_assets, start_url, output_dir, extrac
         readme += f"\n## 🚀 Next Steps for LLM\n"
         readme += f"All absolute URLs have been rewritten to local paths binding these assets logically to the DOM. "
         readme += f"You may now use these HTML files as ground-truth layout references for React component generation.\n"
-        
+            
         zipf.writestr('README.md', readme)
-        
-    return temp_zip.name
-
+            
+    return temp_zip_path

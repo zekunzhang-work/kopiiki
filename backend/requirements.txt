@@ -5,3 +5,4 @@ beautifulsoup4
 cssutils
 requests
 html5lib
+google-genai

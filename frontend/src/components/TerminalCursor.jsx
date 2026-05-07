@@ -11,9 +11,6 @@ const TerminalCursor = () => {
   const DECAY_RATE = 0.05; // How fast the trail fades
   const FILL_COLOR = 'rgba(215, 215, 215, '; // Soft light gray
 
-  // Track if we are hovering over an interactive UI element
-  const hoveredRectRef = useRef(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -41,20 +38,6 @@ const TerminalCursor = () => {
     const handleMouseMove = (e) => {
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
-
-      const target = e.target;
-      if (
-        target && 
-        ['A', 'BUTTON', 'INPUT'].includes(target.tagName) && 
-        !target.classList.contains('url-input')
-      ) {
-        hoveredRectRef.current = target.getBoundingClientRect();
-      } else if (target && (target.closest('a') || target.closest('button'))) {
-        const el = target.closest('a') || target.closest('button');
-        hoveredRectRef.current = el.getBoundingClientRect();
-      } else {
-        hoveredRectRef.current = null;
-      }
     };
     
     window.addEventListener('mousemove', handleMouseMove);
@@ -101,25 +84,7 @@ const TerminalCursor = () => {
         cellsRef.current.set(currentKey, 1.0);
       }
 
-        // If hovering over an interactive structural element, highlight all underlying grid cells
-        if (hoveredRectRef.current) {
-          const rect = hoveredRectRef.current;
-          // Calculate the grid cell boundaries that completely encompass this DOM rect
-          const startCol = Math.floor((rect.left - offsetX) / CELL_WIDTH);
-          const endCol = Math.ceil((rect.right - offsetX) / CELL_WIDTH);
-          const startRow = Math.floor((rect.top - offsetY) / CELL_HEIGHT);
-          const endRow = Math.ceil((rect.bottom - offsetY) / CELL_HEIGHT);
-
-          // Force these specific cells to stay fully opaque while hovered
-          for (let col = startCol; col < endCol; col++) {
-            for (let row = startRow; row < endRow; row++) {
-              const key = `${col}-${row}`;
-              cellsRef.current.set(key, 0.5); // Solid but subtle highlight block overlay
-            }
-          }
-        }
-
-        // Draw all active cells
+      // Draw all active cells
       for (const [key, opacity] of cellsRef.current.entries()) {
         const [col, row] = key.split('-').map(Number);
         

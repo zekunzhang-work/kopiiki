@@ -33,5 +33,7 @@ backend.log
 .env
 .env.local
 backend/test*
+!backend/tests/
+!backend/tests/**
 tmp_*
 agent.md

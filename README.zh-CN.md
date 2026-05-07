@@ -1,96 +1,210 @@
 # Kopiiki
 
-一个用于提取网页快照并打包为独立离线包的工具。
+Kopiiki 有两种提取方式：
 
-## 🚀 快速启动 (GUI 模式)
+- **Snapshot**：生成可离线打开的网站快照 ZIP，并重写本地资源路径。
+- **Design**：使用 Gemini 生成以 `DESIGN.md` 为核心的 Design Capsule，供 Coding Agent 理解并重建网站的设计语言，而不是复制原站版权资产。
 
-执行项目根目录下的脚本可自动完成环境配置和服务启动：
-1. 检查 Python 3 和 Node.js 环境。
-2. 安装后端 (`pip`) 与前端 (`npm`) 依赖。
-3. 下载 Playwright 提取所需的 Chromium 浏览器内核。
-4. 启动 Flask 后端 (`:5002`) 与 Vite 前端 (`:5176`)。
+界面保持极简 TUI 气质：输入网址，选择 `Snapshot / Design`，开始提取，查看日志，下载 ZIP。
+
+## 快速启动
+
+在项目根目录运行：
 
 ```bash
-cd kopiiki
 ./start.sh
 ```
 
-- **前端界面**: http://localhost:5176
-- **后端服务**: http://localhost:5002
+脚本会：
 
----
+1. 检查 Python 3 和 Node.js。
+2. 安装后端与前端依赖。
+3. 安装 Playwright Chromium。
+4. 启动 Flask 后端 `:5002`。
+5. 启动 Vite 前端 `:5176`。
 
-## 🤖 CLI 与 AI Agent 集成
+打开：
 
-Kopiiki 可作为 AI Agent（如 Cursor、Claude Code 等）的数据处理管道。项目中包含了一个用于命令行环境的独立运行脚本。
+- 前端界面：http://localhost:5176
+- 后端服务：http://localhost:5002
 
-### 命令行（CLI）使用方法
-可以在终端中直接调用提取流程：
+Vite 需要 Node.js `20.19+` 或 `22.12+`。
+
+## Gemini 配置
+
+`Snapshot` 不需要 API key。`Design` 需要 Gemini。
+
 ```bash
-# 1. 进入后端目录
-cd kopiiki/backend
+cp .env.example .env
+# 编辑 .env，填入 GEMINI_API_KEY
+```
 
-# 2. 激活 Python 虚拟环境
+可选变量：
+
+```bash
+KOPIIKI_GEMINI_MODEL=gemini-3-pro-preview
+KOPIIKI_GEMINI_MOCK=1
+```
+
+`KOPIIKI_GEMINI_MODEL` 默认是 `gemini-3-pro-preview`。如果账号暂时没有 preview 模型权限，可以改用 `gemini-2.5-pro`。
+
+修改 `.env` 后需要重启后端。
+
+## GUI 使用方法
+
+1. 打开 `http://localhost:5176`。
+2. 在输入行粘贴目标网站 URL。
+3. 选择 `Snapshot` 或 `Design`。
+4. 按 Enter 或点击 return 图标。
+5. 等待日志出现 `DONE`。
+6. 下载生成的 ZIP。
+
+右上角 `HISTORY` 可以下载历史 ZIP、复制相对路径、刷新记录或删除旧文件。生成文件保存在 `backend/downloads`。
+
+右上角 `README` 是产品内简明使用说明。
+
+## 产出模式
+
+### Snapshot
+
+Snapshot 生成：
+
+```text
+<domain>-<jobid>.zip
+```
+
+它会捕获目标页面和本地化后的资源，方便离线打开。
+
+### Design
+
+Design 模式会：
+
+1. 用 Playwright 在 desktop、tablet、mobile 多视口采集确定性浏览器证据。
+2. 把临时截图和 DOM/CSS 证据发送给 Gemini。
+3. 写出 Markdown-first 的 Design Capsule。
+4. 默认不打包原始截图、原站图片、原站视频、logo、商业字体文件或商标化图形。
+
+Design 生成：
+
+```text
+<domain>-design-<jobid>.zip
+```
+
+ZIP 结构：
+
+```text
+DESIGN.md
+design/
+  references/section-anatomy.md
+  references/layout-grammar.md
+  references/font-strategy.md
+  references/component-families.md
+  references/motion.md
+  references/responsive.md
+  references/asset-prompts.md
+  references/visual-checkpoints.md
+  evidence/observations.md
+  evidence/section-map.md
+  evidence/observations.json
+  scripts/validate-design-capsule.mjs
+```
+
+`DESIGN.md` 包含 token、布局语法、section anatomy、字体替代策略、响应式策略、动效策略、do/don't，以及各 reference 文件索引。
+
+素材提示会写清楚格式、尺寸、背景、透明通道要求、使用位置、生成 prompt、避让规则和实现说明。Kopiiki 只写 prompt，不生成、不下载、不打包图像或视频素材。
+
+解压 Design Capsule 后可以运行：
+
+```bash
+node design/scripts/validate-design-capsule.mjs
+```
+
+## CLI 使用方法
+
+进入后端目录：
+
+```bash
+cd backend
 source venv/bin/activate
 
-# 3. 运行爬虫脚本并指定目标 URL
+# Snapshot 模式
 python cli.py https://example.com/
-```
-脚本将唤起无头 Chromium 实例，提取与之关联的至多 6 个子页面，完成内部链接的本地化转换，并将生成的 `[domain].zip` 打包存入 `kopiiki/backend/downloads/`。
+python cli.py https://example.com/ --mode snapshot
 
-### AI Agent 工作流
-大语言模型 Agent 可通过以下步骤将 Kopiiki 接入其自动化工作流：
-1. 执行 Shell 命令 `python cli.py <URL>`。
-2. 使用 `unzip downloads/<domain>.zip -d ./working_dir` 解压生成的压缩包。
-3. 读取生成的 `README.md` 及提取的 `.html` 文件，作为生成 React/Tailwind 代码的参考基准。
-
----
-
-## ⚙️ 技术架构
-
-项目采用前后端分离架构，处理网页渲染与资源抓取：
-
-```
-[ 用户终端 / AI Agent ]
-      │
-[ 前端 (React) :5176 ] <─── 实时进度状态 (SSE) ───┐
-      │                                        │
-      └─── 提取请求 (POST) ───▶ [ 后端 (Flask) :5002 ]
-                                     │
-                                     └──▶ [ Playwright (Chromium) / CLI script ]
-                                               │
-                                               └──▶ [ 目标网页 ]
+# Design 模式
+python cli.py https://example.com/ --mode design
+python cli.py https://example.com/ --design
 ```
 
-- **前端**: 处理交互逻辑与进度的展示。
-- **后端**: Python 服务管理 Playwright 实例，负责高性能的网页渲染、导航解析及静态资源映射。
+CLI 产物会写入 `backend/downloads`。
 
----
+## API 说明
 
-## 🖥️ 前端操作指引
+前端通过这些接口访问 Flask 后端：
 
-Kopiiki 提供了基本的操作界面用于网页提取：
+- `POST /api/extract`，请求体为 `{ url, mode }`
+- `GET /api/progress/<job_id>`，用于 SSE 日志
+- `POST /api/cancel/<job_id>`
+- `GET /api/download/<filename>`
+- `GET /api/history`
+- `GET /api/config`
 
-1. **输入 URL**: 在输入框中输入目标网页地址。
-2. **开始提取**: 点击右侧的 Enter 图标或按下回车键。
-3. **实时监控**: 界面下方显示实时的提取执行日志。
-4. **取消操作**: 提取过程中可随时点击停止图标中断任务。
-5. **获取结果**: 提取完成后，系统会自动生成并下载包含网页资源的 ZIP 压缩包。
+`/api/config` 只返回 Gemini 是否配置、provider、mock 标记和模型名，不会返回 API key。
 
-![前端操作界面预览](docs/assets/preview.png)
+## 验证
 
----
+后端测试使用 Python `unittest`：
 
-## ❤️ 鸣谢与法律声明
+```bash
+PYTHONPYCACHEPREFIX=/tmp/kopiiki-pycache backend/venv/bin/python -m unittest discover -s backend/tests
+```
 
-### 鸣谢
-本工具的开发受到 [**WebTwin**](https://github.com/sirioberati/WebTwin) 项目启发。感谢原作者在网页存档及自动化抓取领域的开源工作。
+mock Design Capsule 测试不需要 Gemini key。如果配置了 `GEMINI_API_KEY`，测试也可以使用本地 HTML fixture 跑真实 Gemini smoke test。
 
-### 法律免责声明
-1. **用途限制**: Kopiiki 仅供个人备份、开发测试、学术研究及教育目的使用。
-2. **合规义务**: 用户在使用本工具时，须确保行为符合目标网站的 `robots.txt` 协议、服务条款及相关版权法律。
-3. **风险自担**: 用户应对提取内容及后续使用行为承担法律责任。开发者不对因使用本工具导致的版权纠纷或法律风险承担责任。
+前端检查：
 
----
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+## 技术架构
+
+```text
+[ Browser UI / CLI / Agent ]
+        |
+        v
+[ React frontend :5176 ] -- SSE logs --> [ Flask backend :5002 ]
+        |                                      |
+        |                                      v
+        |                         [ Playwright Chromium capture ]
+        |                                      |
+        |                                      v
+        |                           [ Target website evidence ]
+        |                                      |
+        |                                      v
+        |                         [ Snapshot ZIP or Gemini Design ZIP ]
+```
+
+核心后端模块：
+
+- `backend/app.py`：API、任务、SSE、History、下载。
+- `backend/cli.py`：命令行入口。
+- `backend/webtwin_assets.py`：Snapshot 提取。
+- `backend/design_evidence.py`：多视口 DOM/CSS/截图证据采集。
+- `backend/gemini_design.py`：Gemini prompt、JSON 解析、fallback normalization。
+- `backend/design_capsule.py`：`DESIGN.md` 和 reference 文件渲染。
+
+## 法律边界
+
+Kopiiki 适用于个人备份、开发测试、研究和教育用途。
+
+用户需要自行确保使用方式符合目标网站服务条款、`robots.txt`、版权法、商标法以及字体/媒体授权要求。
+
+Design 模式默认不包含原始截图、原站图片、原站视频、logo、商业字体文件、商标化图形或大段原文案。它采用 prompt-first 的方式帮助后续 agent 生成替代素材。
+
+## 鸣谢
+
+Kopiiki 受到 [WebTwin](https://github.com/sirioberati/WebTwin) 启发，并进一步扩展到 agent-readable design extraction。
 
 [MIT License](LICENSE)

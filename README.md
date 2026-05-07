@@ -1,98 +1,210 @@
 # Kopiiki
 
-A tool for extracting webpage snapshots into self-contained offline bundles.
+Kopiiki extracts websites in two ways:
 
-## 🚀 Quick Start (GUI Mode)
+- **Snapshot**: an offline website archive with rewritten local assets.
+- **Design**: an AI-generated Design Capsule, centered on `DESIGN.md`, for coding agents that need to rebuild a site's design language without copying protected assets.
 
-The `start.sh` script automates environment setup and launches the frontend and backend services:
-1. Validates Python 3 and Node.js environments.
-2. Installs backend (`pip`) and frontend (`npm`) dependencies.
-3. Downloads the Playwright Chromium binaries required for headless extraction.
-4. Starts the Flask backend (`:5002`) and Vite frontend (`:5176`).
+The app keeps a minimal TUI-inspired interface: paste a URL, choose `Snapshot / Design`, run the extraction, watch the log stream, and download the ZIP.
+
+## Quick Start
+
+Run both services from the project root:
 
 ```bash
-cd kopiiki
 ./start.sh
 ```
 
-- **Frontend Interface**: http://localhost:5176
-- **Backend Service**: http://localhost:5002
+The script:
 
----
+1. Checks Python 3 and Node.js.
+2. Installs backend and frontend dependencies.
+3. Installs Playwright Chromium if needed.
+4. Starts the Flask backend on `:5002`.
+5. Starts the Vite frontend on `:5176`.
 
-## 🤖 CLI & AI Agent Integration
+Open:
 
-Kopiiki can be used as a data-ingestion pipeline for AI agents (such as Cursor, Claude Code, etc.). 
+- Frontend: http://localhost:5176
+- Backend: http://localhost:5002
 
-A dedicated CLI script is provided for headless execution.
+Vite requires Node.js `20.19+` or `22.12+`.
 
-### Manual CLI Usage
-To run the extraction pipeline from the terminal:
+## Gemini Setup
+
+`Snapshot` works without an API key. `Design` requires Gemini.
+
 ```bash
-# 1. Enter the backend directory
-cd kopiiki/backend
+cp .env.example .env
+# edit .env and fill GEMINI_API_KEY
+```
 
-# 2. Activate the Python virtual environment
+Optional variables:
+
+```bash
+KOPIIKI_GEMINI_MODEL=gemini-3-pro-preview
+KOPIIKI_GEMINI_MOCK=1
+```
+
+`KOPIIKI_GEMINI_MODEL` defaults to `gemini-3-pro-preview`. If your account does not have preview model access, use `gemini-2.5-pro`.
+
+Restart the backend after changing `.env`.
+
+## GUI Usage
+
+1. Open `http://localhost:5176`.
+2. Paste a website URL in the input line.
+3. Choose `Snapshot` or `Design`.
+4. Press Enter or click the return icon.
+5. Wait for `DONE`.
+6. Download the generated ZIP.
+
+Use the top-right `HISTORY` panel to download previous ZIP files, copy relative paths, refresh records, or delete old archives. Generated files are stored in `backend/downloads`.
+
+Use the top-right `README` panel for the short in-app guide.
+
+## Output Modes
+
+### Snapshot
+
+Snapshot generates:
+
+```text
+<domain>-<jobid>.zip
+```
+
+It captures the target page and linked local assets so the result can be opened offline.
+
+### Design
+
+Design mode:
+
+1. Captures deterministic browser evidence with Playwright across desktop, tablet, and mobile viewports.
+2. Sends temporary screenshots and extracted DOM/CSS evidence to Gemini.
+3. Writes a Markdown-first Design Capsule.
+4. Does not package original screenshots, source images, source videos, logos, commercial font files, or trademarked artwork.
+
+Design generates:
+
+```text
+<domain>-design-<jobid>.zip
+```
+
+ZIP structure:
+
+```text
+DESIGN.md
+design/
+  references/section-anatomy.md
+  references/layout-grammar.md
+  references/font-strategy.md
+  references/component-families.md
+  references/motion.md
+  references/responsive.md
+  references/asset-prompts.md
+  references/visual-checkpoints.md
+  evidence/observations.md
+  evidence/section-map.md
+  evidence/observations.json
+  scripts/validate-design-capsule.mjs
+```
+
+`DESIGN.md` includes tokens, layout grammar, section anatomy, font fallback guidance, responsive strategy, motion guidance, do/don't rules, and references to asset prompts.
+
+Asset prompts specify format, size, background, alpha/transparent requirements, placement, generation prompt, avoid rules, and implementation notes. Kopiiki only writes prompts; it does not generate or download image/video assets.
+
+After unzipping a Design Capsule, run:
+
+```bash
+node design/scripts/validate-design-capsule.mjs
+```
+
+## CLI Usage
+
+From the backend directory:
+
+```bash
+cd backend
 source venv/bin/activate
 
-# 3. Execute the crawler targeting your desired URL
+# Snapshot mode
 python cli.py https://example.com/
-```
-The script will start a headless Chromium instance, extract up to 6 top-level sub-pages, map the internal links, and save the resulting `[domain].zip` archive into `kopiiki/backend/downloads/`.
+python cli.py https://example.com/ --mode snapshot
 
-### AI Agent Workflow
-LLM agents can integrate Kopiiki into their routines using the following steps:
-1. Execute the shell command `python cli.py <URL>`.
-2. Extract the archive using `unzip downloads/<domain>.zip -d ./working_dir`.
-3. Read the generated `README.md` and the extracted `.html` components to establish a layout reference for generating React/Tailwind code.
-
----
-
-## ⚙️ Architecture
-
-The project uses a decoupled architecture for concurrent page rendering and asset fetching:
-
-```
-[ User Browser / AI Agent ]
-      │
-[ Frontend (React) :5176 ] <─── Real-time Status (SSE) ───┐
-      │                                                   │
-      └─── Extraction Request (POST) ───▶ [ Backend (Flask) :5002 ]
-                                              │
-                                              └──▶ [ Playwright (Chromium) / CLI script ]
-                                                        │
-                                                        └──▶ [ Target Website ]
+# Design mode
+python cli.py https://example.com/ --mode design
+python cli.py https://example.com/ --design
 ```
 
-- **Frontend**: Handles user interaction and progress tracking.
-- **Backend**: Python service managing Playwright instances for rendering, navigation parsing, and local asset mapping.
+CLI output is written to `backend/downloads`.
 
----
+## API Notes
 
-## 🖥️ Frontend Guide
+The frontend talks to the Flask backend over:
 
-Kopiiki provides an interface for straightforward operations:
+- `POST /api/extract` with `{ url, mode }`
+- `GET /api/progress/<job_id>` for SSE logs
+- `POST /api/cancel/<job_id>`
+- `GET /api/download/<filename>`
+- `GET /api/history`
+- `GET /api/config`
 
-1. **Enter URL**: Type the target website URL in the central input field.
-2. **Start Extraction**: Click the **Enter (KeyReturn)** icon on the right or press the Enter key.
-3. **Monitor Progress**: Review real-time logs in the buffer below to track asset downloads.
-4. **Cancel Job**: Click the **Stop (StopCircle)** icon at any time to abort the task.
-5. **Get Result**: A ZIP bundle containing the offline-ready snapshot will be downloaded automatically upon completion.
+`/api/config` reports whether Gemini is configured, the provider, mock flag, and model name. It never returns the API key.
 
-![Frontend Interface Preview](docs/assets/preview.png)
+## Validation
 
----
+Backend tests use Python `unittest`:
 
-## ❤️ Acknowledgements & Legal Disclaimer
+```bash
+PYTHONPYCACHEPREFIX=/tmp/kopiiki-pycache backend/venv/bin/python -m unittest discover -s backend/tests
+```
 
-### Acknowledgements
-This project is inspired by and built upon the foundation of [**WebTwin**](https://github.com/sirioberati/WebTwin). We thank the original authors for their open-source contributions to web archival research.
+The mock Design Capsule tests run without a Gemini key. If `GEMINI_API_KEY` is set, the suite can also run a real Gemini smoke test against a local HTML fixture.
 
-### Legal Disclaimer
-1. **Intended Use**: Kopiiki is designed for personal backup, testing, research, and educational purposes ONLY.
-2. **Compliance**: Users are responsible for ensuring their usage complies with the target website's `robots.txt`, Terms of Service, and applicable copyright laws.
-3. **Liability**: The developers of Kopiiki assume no liability for any misuse of this tool, copyright infringement, or legal issues resulting from extracted content.
+Frontend checks:
 
----
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+## Architecture
+
+```text
+[ Browser UI / CLI / Agent ]
+        |
+        v
+[ React frontend :5176 ] -- SSE logs --> [ Flask backend :5002 ]
+        |                                      |
+        |                                      v
+        |                         [ Playwright Chromium capture ]
+        |                                      |
+        |                                      v
+        |                           [ Target website evidence ]
+        |                                      |
+        |                                      v
+        |                         [ Snapshot ZIP or Gemini Design ZIP ]
+```
+
+Key backend modules:
+
+- `backend/app.py`: API, jobs, SSE, history, downloads.
+- `backend/cli.py`: headless CLI entrypoint.
+- `backend/webtwin_assets.py`: Snapshot extraction.
+- `backend/design_evidence.py`: multi-viewport DOM/CSS/screenshot evidence.
+- `backend/gemini_design.py`: Gemini prompt, JSON parsing, fallback normalization.
+- `backend/design_capsule.py`: `DESIGN.md` and reference file rendering.
+
+## Legal Boundary
+
+Kopiiki is intended for personal backup, development, testing, research, and education.
+
+Users are responsible for respecting target-site terms, `robots.txt`, copyright law, trademark law, and font/media licenses.
+
+Design mode is deliberately prompt-first: it does not include source screenshots, source imagery, source videos, logos, commercial font files, trademarked graphics, or full original copy by default.
+
+## Acknowledgements
+
+Kopiiki is inspired by [WebTwin](https://github.com/sirioberati/WebTwin) and extends the idea toward agent-readable design extraction.
 
 [MIT License](LICENSE)
