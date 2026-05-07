@@ -5,8 +5,6 @@ Kopiiki extracts websites in two ways:
 - **Snapshot**: an offline website archive with rewritten local assets.
 - **Design**: an AI-generated Design Capsule, centered on `DESIGN.md`, for coding agents that need to rebuild a site's design language without copying protected assets.
 
-The app keeps a minimal TUI-inspired interface: paste a URL, choose `Snapshot / Design`, run the extraction, watch the log stream, and download the ZIP.
-
 ## Quick Start
 
 Run both services from the project root:
@@ -171,19 +169,22 @@ npm --prefix frontend run build
 ## Architecture
 
 ```text
-[ Browser UI / CLI / Agent ]
-        |
-        v
-[ React frontend :5176 ] -- SSE logs --> [ Flask backend :5002 ]
-        |                                      |
-        |                                      v
-        |                         [ Playwright Chromium capture ]
-        |                                      |
-        |                                      v
-        |                           [ Target website evidence ]
-        |                                      |
-        |                                      v
-        |                         [ Snapshot ZIP or Gemini Design ZIP ]
+[ Browser UI :5176 ] -- POST /api/extract --> [ Flask backend :5002 ]
+[ Browser UI :5176 ] <-- SSE progress logs -- [ Flask backend :5002 ]
+
+[ CLI / Agent ] ----------------------------> [ backend/cli.py ]
+                                                   |
+                                                   v
+                                      [ Snapshot / Design pipeline ]
+                                                   |
+                                                   v
+                                      [ Playwright Chromium capture ]
+                                                   |
+                                                   v
+                                      [ Target website evidence ]
+                                                   |
+                                                   v
+                                [ Snapshot ZIP or Gemini Design ZIP ]
 ```
 
 Key backend modules:

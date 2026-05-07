@@ -5,8 +5,6 @@ Kopiiki 有两种提取方式：
 - **Snapshot**：生成可离线打开的网站快照 ZIP，并重写本地资源路径。
 - **Design**：使用 Gemini 生成以 `DESIGN.md` 为核心的 Design Capsule，供 Coding Agent 理解并重建网站的设计语言，而不是复制原站版权资产。
 
-界面保持极简 TUI 气质：输入网址，选择 `Snapshot / Design`，开始提取，查看日志，下载 ZIP。
-
 ## 快速启动
 
 在项目根目录运行：
@@ -171,19 +169,22 @@ npm --prefix frontend run build
 ## 技术架构
 
 ```text
-[ Browser UI / CLI / Agent ]
-        |
-        v
-[ React frontend :5176 ] -- SSE logs --> [ Flask backend :5002 ]
-        |                                      |
-        |                                      v
-        |                         [ Playwright Chromium capture ]
-        |                                      |
-        |                                      v
-        |                           [ Target website evidence ]
-        |                                      |
-        |                                      v
-        |                         [ Snapshot ZIP or Gemini Design ZIP ]
+[ Browser UI :5176 ] -- POST /api/extract --> [ Flask backend :5002 ]
+[ Browser UI :5176 ] <-- SSE progress logs -- [ Flask backend :5002 ]
+
+[ CLI / Agent ] ----------------------------> [ backend/cli.py ]
+                                                   |
+                                                   v
+                                      [ Snapshot / Design pipeline ]
+                                                   |
+                                                   v
+                                      [ Playwright Chromium capture ]
+                                                   |
+                                                   v
+                                      [ Target website evidence ]
+                                                   |
+                                                   v
+                                [ Snapshot ZIP or Gemini Design ZIP ]
 ```
 
 核心后端模块：
