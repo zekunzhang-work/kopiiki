@@ -14,9 +14,7 @@ Use this checklist before tagging a public Kopiiki release.
 ## Security
 
 - `.env` and `.env.*` are not tracked by git.
-- `.env` and `.env.*` are excluded from Docker build context.
 - Backend binds to `127.0.0.1` by default for local runs.
-- Docker explicitly sets `KOPIIKI_HOST=0.0.0.0`.
 - CORS is restricted to trusted local origins by default.
 - Private network targets are blocked unless `KOPIIKI_ALLOW_PRIVATE_TARGETS=1`.
 - `/api/config` does not expose API keys.

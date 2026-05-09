@@ -936,7 +936,7 @@ def api_extract_json():
     # natively optimized for our LLM to generate React components.
     return jsonify({"message": "Not implemented yet. Reserved for Kopiiki-Agent."})
 
-# ── Static file serving for Docker single-port mode ──────────────
+# ── Static file serving for single-port mode ─────────────────────
 # When KOPIIKI_STATIC_DIR is set, Flask serves the pre-built frontend
 # so that both API and UI live on a single port (no separate Vite server).
 STATIC_DIR = os.environ.get('KOPIIKI_STATIC_DIR')

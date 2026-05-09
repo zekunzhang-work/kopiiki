@@ -167,11 +167,10 @@ The frontend talks to the Flask backend over:
 Kopiiki is a local developer tool, not a public hosted crawler.
 
 - The backend binds to `127.0.0.1` by default.
-- Docker sets `KOPIIKI_HOST=0.0.0.0` inside the container because Docker controls published ports.
 - CORS is restricted to local frontend origins by default.
 - `/api/extract` accepts only `http://` and `https://` URLs.
 - Localhost, private network, link-local, multicast, reserved, and unspecified IP targets are blocked by default.
-- `.env` and `.env.*` are ignored by git and Docker build context.
+- `.env` and `.env.*` are ignored by git.
 
 See [SECURITY.md](SECURITY.md) before exposing Kopiiki beyond your own machine.
 

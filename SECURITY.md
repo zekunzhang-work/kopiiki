@@ -6,15 +6,14 @@ Kopiiki is designed as a local developer tool. Do not expose the Flask backend d
 
 - Run the GUI locally on `http://localhost:5176`.
 - Run the backend locally on `http://127.0.0.1:5002`.
-- Use Docker for local or trusted-network deployments.
 
 ## Default Protections
 
-- The backend binds to `127.0.0.1` by default. Docker sets `KOPIIKI_HOST=0.0.0.0` inside the container because port publishing is controlled by Docker.
+- The backend binds to `127.0.0.1` by default.
 - CORS is restricted to local frontend origins by default.
 - Extraction only accepts `http://` and `https://` target URLs.
 - Localhost, private network, link-local, multicast, reserved, and unspecified IP targets are blocked by default to reduce SSRF risk.
-- `.env` and `.env.*` are ignored by both git and Docker build context.
+- `.env` and `.env.*` are ignored by git.
 - Design mode does not write source screenshots, source images, source videos, logo files, or commercial font files into the output ZIP.
 
 ## Sensitive Configuration

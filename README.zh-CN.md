@@ -167,11 +167,10 @@ CLI 产物会写入 `backend/downloads`。
 Kopiiki 是本地开发工具，不是公开托管的爬虫服务。
 
 - 后端默认绑定 `127.0.0.1`。
-- Docker 内部设置 `KOPIIKI_HOST=0.0.0.0`，端口暴露由 Docker 控制。
 - CORS 默认限制为本地前端来源。
 - `/api/extract` 只接受 `http://` 和 `https://` URL。
 - localhost、内网、link-local、multicast、reserved、unspecified IP 目标默认会被阻止。
-- `.env` 和 `.env.*` 已从 git 与 Docker build context 中排除。
+- `.env` 和 `.env.*` 已从 git 中排除。
 
 如果要把 Kopiiki 暴露到自己电脑之外，请先阅读 [SECURITY.md](SECURITY.md)。
 
