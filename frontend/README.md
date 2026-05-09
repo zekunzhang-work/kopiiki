@@ -54,6 +54,8 @@ Extraction still needs Playwright Chromium to be installed before Snapshot or De
 
 `Snapshot` creates an offline website archive. `Design` creates a Gemini-powered Design Capsule with `DESIGN.md`, reference files, and asset prompts for coding agents.
 
+Design mode is prompt-first. It does not package source screenshots, source imagery, source videos, logos, commercial font files, trademarked graphics, or full original copy by default.
+
 ## Gemini State
 
 `Design` needs `GEMINI_API_KEY` on the backend. The frontend reads `/api/config` only to show whether Gemini is configured. The API key is never sent to the browser.
@@ -78,4 +80,4 @@ npm audit --audit-level=moderate
 - `src/components/ReadmeDrawer.jsx`: short in-app guide.
 - `src/components/TopNav.jsx`: top navigation and external links.
 - `src/components/TerminalCursor.jsx`: terminal-style cursor trail.
-- `src/index.css`: TUI layout, hover rules, responsive styling.
+- `src/index.css`: terminal-style layout, hover rules, responsive styling.

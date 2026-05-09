@@ -1,9 +1,23 @@
 # Kopiiki
 
+Kopiiki 是一个本地工具，可以把网站转换成离线快照，或转换成给 Coding Agent 阅读的设计参考。
+
+它面向设计师、前端工程师和 Agent 构建者：目标是理解一个网站的设计语言，而不是复制原站受保护的素材。
+
 Kopiiki 有两种提取方式：
 
 - **Snapshot**：生成可离线打开的网站快照 ZIP，并重写本地资源路径。
-- **Design**：使用 Gemini 生成以 `DESIGN.md` 为核心的 Design Capsule，供 Coding Agent 理解并重建网站的设计语言，而不是复制原站版权资产。
+- **Design**：使用 Gemini 生成以 `DESIGN.md` 为核心的 Design Capsule，提取可迁移的设计决策，包括布局语法、section anatomy、响应式行为、字体替代策略、视觉检查点和素材生成 prompts。
+
+Design 模式不是“克隆网站”的流程。它是一份 prompt-first 的设计标准，帮助 Agent 重建相近的设计语言，同时避免使用原始截图、logo、图片、视频、商业字体文件、商标化图形和大段原文案。
+
+当前发布状态：**alpha**。Kopiiki 适合本地实验、设计研究和 Coding Agent 工作流探索。
+
+## 为什么需要 Kopiiki
+
+截图有用，但它无法解释节奏、层级、响应式规则、组件族和素材角色。CSS 有用，但它无法解释设计意图。
+
+Kopiiki 的 Design Capsule 尝试补上这部分：把浏览器证据转换成 Markdown-first 的设计参考，让 Coding Agent 能阅读、验证，并用于实现。
 
 ## 快速启动
 

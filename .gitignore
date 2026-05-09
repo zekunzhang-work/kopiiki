@@ -12,6 +12,7 @@ build/
 # Kopiiki working directories
 downloads/
 extracted_sites/
+docs/launch/
 
 # IDE
 .vscode/

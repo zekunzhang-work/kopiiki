@@ -1,9 +1,23 @@
 # Kopiiki
 
+Kopiiki is a local tool for turning websites into offline snapshots or AI-readable design references for coding agents.
+
+It is built for designers, frontend engineers, and agent builders who need to understand a website's design language without copying protected source assets.
+
 Kopiiki extracts websites in two ways:
 
 - **Snapshot**: an offline website archive with rewritten local assets.
-- **Design**: an AI-generated Design Capsule, centered on `DESIGN.md`, for coding agents that need to rebuild a site's design language without copying protected assets.
+- **Design**: an AI-generated Design Capsule, centered on `DESIGN.md`, that captures transferable design decisions: layout grammar, section anatomy, responsive behavior, font fallback strategy, visual checkpoints, and asset prompts.
+
+Design mode is not a website cloning workflow. It is a prompt-first design standard that helps agents rebuild a similar design language while avoiding source screenshots, logos, images, videos, commercial font files, trademarked graphics, and full original copy.
+
+Current release status: **alpha**. Kopiiki is intended for local experimentation, design research, and coding-agent workflows.
+
+## Why Kopiiki
+
+Screenshots are useful, but they do not explain rhythm, hierarchy, responsive rules, component families, or asset roles. Raw CSS is useful, but it does not explain design intent.
+
+Kopiiki's Design Capsule tries to bridge that gap: it turns browser evidence into a Markdown-first design reference that a coding agent can read, validate, and use as implementation guidance.
 
 ## Quick Start
 

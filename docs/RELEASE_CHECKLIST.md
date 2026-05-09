@@ -35,6 +35,18 @@ Use this checklist before tagging a public Kopiiki release.
 - `frontend/README.md` is current.
 - `SECURITY.md` is current.
 - Legal boundary clearly distinguishes personal backup/research from unauthorized reuse or redistribution.
+- Private launch notes, tweet drafts, screenshots, videos, and campaign materials are not tracked in git.
+
+## Human TODO
+
+These items cannot be completed from the codebase alone:
+
+- Create a GitHub release for `v0.1.0-alpha`.
+- Add repository topics in GitHub settings.
+- Add a product screenshot or GIF to the GitHub README if desired.
+- Record a short demo video if you want to announce on Twitter/X.
+- Write the final Twitter/X post with the actual GitHub release link.
+- Manually run a real Gemini smoke test with your own `GEMINI_API_KEY` before announcing Design mode broadly.
 
 ## Tagging
 
