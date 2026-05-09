@@ -36,6 +36,14 @@ http://localhost:5176
 
 Vite requires Node.js `20.19+` or `22.12+`.
 
+If Playwright Chromium installation hangs while using `../start.sh`, you can start the UI only:
+
+```bash
+KOPIIKI_SKIP_BROWSER_INSTALL=1 ../start.sh
+```
+
+Extraction still needs Playwright Chromium to be installed before Snapshot or Design jobs can run.
+
 ## Usage Flow
 
 1. Paste a website URL.
@@ -50,11 +58,16 @@ Vite requires Node.js `20.19+` or `22.12+`.
 
 `Design` needs `GEMINI_API_KEY` on the backend. The frontend reads `/api/config` only to show whether Gemini is configured. The API key is never sent to the browser.
 
+## API Boundary
+
+The backend is intended to run locally. By default it restricts CORS to local frontend origins and blocks localhost/private-network extraction targets unless `KOPIIKI_ALLOW_PRIVATE_TARGETS=1` is set for trusted local testing.
+
 ## Checks
 
 ```bash
 npm run lint
 npm run build
+npm audit --audit-level=moderate
 ```
 
 ## Key Files

@@ -59,7 +59,7 @@ class AppModeApiTests(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_old_extract_request_defaults_to_snapshot_mode(self):
-        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True), patch.object(app_module.threading, "Thread", FakeThread):
+        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True), patch.object(app_module, "validate_target_url", return_value=None), patch.object(app_module.threading, "Thread", FakeThread):
             response = self.client.post("/api/extract", json={"url": "https://example.com/"})
 
         self.assertEqual(response.status_code, 200)
@@ -70,7 +70,7 @@ class AppModeApiTests(unittest.TestCase):
         self.assertNotIn("-design", job["filename"])
 
     def test_design_mode_without_key_returns_clear_error(self):
-        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True), patch.dict(os.environ, {"GEMINI_API_KEY": "", "KOPIIKI_GEMINI_MOCK": ""}):
+        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True), patch.object(app_module, "validate_target_url", return_value=None), patch.dict(os.environ, {"GEMINI_API_KEY": "", "KOPIIKI_GEMINI_MOCK": ""}):
             response = self.client.post("/api/extract", json={"url": "https://example.com/", "mode": "design"})
 
         self.assertEqual(response.status_code, 400)
@@ -83,6 +83,21 @@ class AppModeApiTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("snapshot", response.get_json()["error"])
+
+    def test_private_targets_are_blocked_by_default(self):
+        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True), patch.object(app_module, "PRIVATE_TARGETS_ALLOWED", False):
+            response = self.client.post("/api/extract", json={"url": "http://127.0.0.1:5176/", "mode": "snapshot"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("blocked", response.get_json()["error"])
+        self.assertEqual(app_module.EXTRACTION_JOBS, {})
+
+    def test_non_http_urls_are_rejected(self):
+        with patch.object(app_module, "PLAYWRIGHT_AVAILABLE", True):
+            response = self.client.post("/api/extract", json={"url": "file:///tmp/site.html", "mode": "snapshot"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("http", response.get_json()["error"])
 
     def test_config_endpoint_reports_design_ai_without_exposing_key(self):
         with patch.dict(os.environ, {"KOPIIKI_GEMINI_MOCK": "1", "GEMINI_API_KEY": "secret-test-key"}):

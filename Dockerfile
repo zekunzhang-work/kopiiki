@@ -38,6 +38,7 @@ COPY --from=frontend-build /app/frontend/dist ./static
 
 # Environment: tell Flask to serve the frontend
 ENV KOPIIKI_STATIC_DIR=/app/static
+ENV KOPIIKI_HOST=0.0.0.0
 ENV PORT=5000
 
 EXPOSE 5000

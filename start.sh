@@ -18,7 +18,32 @@ NC='\033[0m' # No Color
 
 info()  { echo -e "${CYAN}[kopiiki]${NC} $1"; }
 ok()    { echo -e "${GREEN}[  ✓  ]${NC} $1"; }
+warn()  { echo -e "\033[0;33m[  !  ]${NC} $1"; }
 fail()  { echo -e "${RED}[  ✗  ]${NC} $1"; exit 1; }
+
+run_with_timeout() {
+    local seconds="$1"
+    shift
+
+    "$@" &
+    local cmd_pid=$!
+
+    (
+        sleep "$seconds"
+        if kill -0 "$cmd_pid" 2>/dev/null; then
+            kill "$cmd_pid" 2>/dev/null || true
+            sleep 2
+            kill -9 "$cmd_pid" 2>/dev/null || true
+        fi
+    ) &
+    local watcher_pid=$!
+
+    wait "$cmd_pid"
+    local status=$?
+    kill "$watcher_pid" 2>/dev/null || true
+    wait "$watcher_pid" 2>/dev/null || true
+    return "$status"
+}
 
 # ── Step 1: Check prerequisites ──────────────────────────
 
@@ -53,8 +78,16 @@ pip install -q -r "$BACKEND_DIR/requirements.txt"
 
 # Check if Playwright browsers are installed
 if ! python3 -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); b = p.chromium.launch(); b.close(); p.stop()" 2>/dev/null; then
-    info "Installing Playwright Chromium browser..."
-    playwright install chromium
+    if [ "${KOPIIKI_SKIP_BROWSER_INSTALL:-}" = "1" ]; then
+        warn "Playwright Chromium is not installed. Starting UI anyway because KOPIIKI_SKIP_BROWSER_INSTALL=1."
+        warn "Snapshot and Design extraction will fail until you run: cd backend && source venv/bin/activate && playwright install chromium"
+    else
+        PLAYWRIGHT_INSTALL_TIMEOUT="${KOPIIKI_PLAYWRIGHT_INSTALL_TIMEOUT:-180}"
+        info "Installing Playwright Chromium browser with ${PLAYWRIGHT_INSTALL_TIMEOUT}s timeout..."
+        if ! run_with_timeout "$PLAYWRIGHT_INSTALL_TIMEOUT" playwright install chromium; then
+            fail "Playwright Chromium install failed or timed out. Run it manually with: cd backend && source venv/bin/activate && playwright install chromium. To start only the UI, set KOPIIKI_SKIP_BROWSER_INSTALL=1."
+        fi
+    fi
 fi
 
 ok "Backend ready"

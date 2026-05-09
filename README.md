@@ -42,11 +42,24 @@ Optional variables:
 ```bash
 KOPIIKI_GEMINI_MODEL=gemini-3-pro-preview
 KOPIIKI_GEMINI_MOCK=1
+KOPIIKI_HOST=127.0.0.1
+KOPIIKI_ALLOWED_ORIGINS=http://localhost:5176,http://127.0.0.1:5176
+KOPIIKI_ALLOW_PRIVATE_TARGETS=1
 ```
 
 `KOPIIKI_GEMINI_MODEL` defaults to `gemini-3-pro-preview`. If your account does not have preview model access, use `gemini-2.5-pro`.
 
 Restart the backend after changing `.env`.
+
+`KOPIIKI_ALLOW_PRIVATE_TARGETS=1` is only for trusted local testing against localhost or private network targets. Keep it disabled for normal use.
+
+If Playwright Chromium installation hangs on a restricted network, start the UI only with:
+
+```bash
+KOPIIKI_SKIP_BROWSER_INSTALL=1 ./start.sh
+```
+
+Extraction will require a working Playwright Chromium install.
 
 ## GUI Usage
 
@@ -149,6 +162,19 @@ The frontend talks to the Flask backend over:
 
 `/api/config` reports whether Gemini is configured, the provider, mock flag, and model name. It never returns the API key.
 
+## Security Defaults
+
+Kopiiki is a local developer tool, not a public hosted crawler.
+
+- The backend binds to `127.0.0.1` by default.
+- Docker sets `KOPIIKI_HOST=0.0.0.0` inside the container because Docker controls published ports.
+- CORS is restricted to local frontend origins by default.
+- `/api/extract` accepts only `http://` and `https://` URLs.
+- Localhost, private network, link-local, multicast, reserved, and unspecified IP targets are blocked by default.
+- `.env` and `.env.*` are ignored by git and Docker build context.
+
+See [SECURITY.md](SECURITY.md) before exposing Kopiiki beyond your own machine.
+
 ## Validation
 
 Backend tests use Python `unittest`:
@@ -164,7 +190,10 @@ Frontend checks:
 ```bash
 npm --prefix frontend run lint
 npm --prefix frontend run build
+npm --prefix frontend audit --audit-level=moderate
 ```
+
+Release checklist: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
 
 ## Architecture
 
@@ -201,6 +230,8 @@ Key backend modules:
 Kopiiki is intended for personal backup, development, testing, research, and education.
 
 Users are responsible for respecting target-site terms, `robots.txt`, copyright law, trademark law, and font/media licenses.
+
+Snapshot mode may include source website assets and should be used only where you have the right to create a local archive.
 
 Design mode is deliberately prompt-first: it does not include source screenshots, source imagery, source videos, logos, commercial font files, trademarked graphics, or full original copy by default.
 

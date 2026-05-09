@@ -42,11 +42,24 @@ cp .env.example .env
 ```bash
 KOPIIKI_GEMINI_MODEL=gemini-3-pro-preview
 KOPIIKI_GEMINI_MOCK=1
+KOPIIKI_HOST=127.0.0.1
+KOPIIKI_ALLOWED_ORIGINS=http://localhost:5176,http://127.0.0.1:5176
+KOPIIKI_ALLOW_PRIVATE_TARGETS=1
 ```
 
 `KOPIIKI_GEMINI_MODEL` 默认是 `gemini-3-pro-preview`。如果账号暂时没有 preview 模型权限，可以改用 `gemini-2.5-pro`。
 
 修改 `.env` 后需要重启后端。
+
+`KOPIIKI_ALLOW_PRIVATE_TARGETS=1` 只适合可信本地测试，例如提取 localhost 或内网目标。日常使用建议保持关闭。
+
+如果受限网络导致 Playwright Chromium 安装卡住，可以先只启动界面：
+
+```bash
+KOPIIKI_SKIP_BROWSER_INSTALL=1 ./start.sh
+```
+
+真正执行提取仍然需要可用的 Playwright Chromium。
 
 ## GUI 使用方法
 
@@ -149,6 +162,19 @@ CLI 产物会写入 `backend/downloads`。
 
 `/api/config` 只返回 Gemini 是否配置、provider、mock 标记和模型名，不会返回 API key。
 
+## 安全默认值
+
+Kopiiki 是本地开发工具，不是公开托管的爬虫服务。
+
+- 后端默认绑定 `127.0.0.1`。
+- Docker 内部设置 `KOPIIKI_HOST=0.0.0.0`，端口暴露由 Docker 控制。
+- CORS 默认限制为本地前端来源。
+- `/api/extract` 只接受 `http://` 和 `https://` URL。
+- localhost、内网、link-local、multicast、reserved、unspecified IP 目标默认会被阻止。
+- `.env` 和 `.env.*` 已从 git 与 Docker build context 中排除。
+
+如果要把 Kopiiki 暴露到自己电脑之外，请先阅读 [SECURITY.md](SECURITY.md)。
+
 ## 验证
 
 后端测试使用 Python `unittest`：
@@ -164,7 +190,10 @@ mock Design Capsule 测试不需要 Gemini key。如果配置了 `GEMINI_API_KEY
 ```bash
 npm --prefix frontend run lint
 npm --prefix frontend run build
+npm --prefix frontend audit --audit-level=moderate
 ```
+
+发版检查清单：[docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md)。
 
 ## 技术架构
 
@@ -201,6 +230,8 @@ npm --prefix frontend run build
 Kopiiki 适用于个人备份、开发测试、研究和教育用途。
 
 用户需要自行确保使用方式符合目标网站服务条款、`robots.txt`、版权法、商标法以及字体/媒体授权要求。
+
+Snapshot 模式可能包含原站资源，只应在你有权创建本地归档的场景中使用。
 
 Design 模式默认不包含原始截图、原站图片、原站视频、logo、商业字体文件、商标化图形或大段原文案。它采用 prompt-first 的方式帮助后续 agent 生成替代素材。
 

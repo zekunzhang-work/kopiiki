@@ -2,6 +2,8 @@ import os
 import shutil
 import threading
 import zipfile
+import ipaddress
+import socket
 from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
@@ -26,13 +28,34 @@ except ImportError:
     print("Playwright is not installed. Will fallback to basic extraction if needed.")
 
 app = Flask(__name__)
-# Enable CORS to allow React frontend (e.g. localhost:5173) to send requests
-CORS(app, expose_headers=["Content-Disposition"])
+
+
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def allowed_cors_origins():
+    raw = os.environ.get(
+        "KOPIIKI_ALLOWED_ORIGINS",
+        "http://localhost:5176,http://127.0.0.1:5176,http://localhost:5000,http://127.0.0.1:5000",
+    )
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+
+CORS(
+    app,
+    resources={r"/api/*": {"origins": allowed_cors_origins()}},
+    expose_headers=["Content-Disposition"],
+)
 
 EXTRACTION_LOCK = Lock()
 HISTORY_LOCK = Lock()
 EXTRACTION_JOBS = {}
 TERMINAL_STATUSES = {"complete", "error", "cancelled"}
+PRIVATE_TARGETS_ALLOWED = env_flag("KOPIIKI_ALLOW_PRIVATE_TARGETS", default=False)
 
 
 # --- Configuration (moved from old WebTwin app.py) ---
@@ -108,6 +131,60 @@ def safe_download_path(filename):
     if os.path.commonpath([downloads_root, file_path]) != downloads_root:
         return None, safe_filename
     return file_path, safe_filename
+
+
+def is_blocked_ip_address(address):
+    ip = ipaddress.ip_address(address)
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def validate_target_url(url):
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        return "URL must start with http:// or https://."
+
+    if parsed.username or parsed.password:
+        return "URL credentials are not allowed."
+
+    hostname = parsed.hostname
+    if not hostname:
+        return "URL must include a hostname."
+
+    if PRIVATE_TARGETS_ALLOWED:
+        return None
+
+    normalized_host = hostname.strip().lower().rstrip(".")
+    if normalized_host == "localhost" or normalized_host.endswith(".localhost"):
+        return "Localhost targets are blocked by default. Set KOPIIKI_ALLOW_PRIVATE_TARGETS=1 for trusted local testing."
+
+    try:
+        if is_blocked_ip_address(normalized_host):
+            return "Private, loopback, link-local, multicast, reserved, and unspecified IP targets are blocked by default."
+        return None
+    except ValueError:
+        pass
+
+    try:
+        resolved = socket.getaddrinfo(normalized_host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return "Could not resolve target hostname."
+
+    for item in resolved:
+        address = item[4][0]
+        try:
+            if is_blocked_ip_address(address):
+                return "Target resolves to a private or non-public IP address, which is blocked by default."
+        except ValueError:
+            return "Target resolved to an invalid IP address."
+
+    return None
 
 
 def enrich_history_record(record):
@@ -612,6 +689,10 @@ def api_extract():
     if mode not in {"snapshot", "design"}:
         return jsonify({"error": "mode must be either 'snapshot' or 'design'."}), 400
 
+    url_error = validate_target_url(url)
+    if url_error:
+        return jsonify({"error": url_error}), 400
+
     if not PLAYWRIGHT_AVAILABLE:
         return jsonify({"error": "Playwright is not installed on the backend. Please install it."}), 500
 
@@ -873,9 +954,10 @@ if STATIC_DIR and os.path.isdir(STATIC_DIR):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5002))
+    host = os.environ.get('KOPIIKI_HOST', '127.0.0.1')
     print(f"\n{'='*50}")
-    print(f"  🔮 Kopiiki Backend running on port {port}")
+    print(f"  🔮 Kopiiki Backend running on {host}:{port}")
     if STATIC_DIR:
         print(f"  📁 Serving frontend from: {STATIC_DIR}")
     print(f"{'='*50}\n")
-    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
+    app.run(host=host, port=port, debug=False, threaded=True, load_dotenv=False)
