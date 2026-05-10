@@ -17,6 +17,7 @@ docs/launch/
 # IDE
 .vscode/
 .idea/
+.codex/
 *.swp
 *.swo
 *~
