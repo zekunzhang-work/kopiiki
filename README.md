@@ -19,6 +19,10 @@ Screenshots are useful, but they do not explain rhythm, hierarchy, responsive ru
 
 Kopiiki's Design Capsule tries to bridge that gap: it turns browser evidence into a Markdown-first design reference that a coding agent can read, validate, and use as implementation guidance.
 
+## Preview
+
+![Kopiiki interface](docs/assets/kopiiki-preview.png)
+
 ## Quick Start
 
 Run both services from the project root:

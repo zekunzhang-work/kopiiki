@@ -34,6 +34,7 @@ Use this checklist before tagging a public Kopiiki release.
 - `README.zh-CN.md` is current.
 - `frontend/README.md` is current.
 - `SECURITY.md` is current.
+- `docs/PUBLISHING.md` is current.
 - Legal boundary clearly distinguishes personal backup/research from unauthorized reuse or redistribution.
 - Private launch notes, tweet drafts, screenshots, videos, and campaign materials are not tracked in git.
 
